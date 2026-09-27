@@ -123,12 +123,6 @@ fast-check for tests, oxlint for linting, GitHub Actions for CI and deploys. The
 merge logic is hand-written, with no CRDT library: understanding the merge is
 the point.
 
-## Docs
-
-- [Approach](docs/APPROACH.md): how it works, the trade-offs, and where it would break in production
-- [Plan](docs/PLAN.md): goals, ground rules, milestones and their status
-- [Journal](docs/JOURNAL.md): every problem hit while building it, and how it was resolved
-
 ---
 
 Built by [Hemant Singh Yadav](https://hemant10yadav.github.io).
