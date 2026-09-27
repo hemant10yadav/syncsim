@@ -1,3 +1,4 @@
+import type { RegisterStrategy } from './registers';
 import { Replica } from './replica';
 import { createRng, type Rng } from './rng';
 import type { FieldName, FieldValue, NodeId, Operation, RecordId, VersionVector } from './types';
@@ -57,6 +58,8 @@ export interface SimulationOptions {
   readonly seed: number;
   readonly devices: readonly DeviceSpec[];
   readonly network?: Partial<NetworkConditions>;
+  /** How register fields resolve concurrent writes on every device. */
+  readonly registers?: RegisterStrategy;
 }
 
 export interface SettleResult {
@@ -90,9 +93,10 @@ export class Simulation {
   constructor(options: SimulationOptions) {
     this.#rng = createRng(options.seed);
     this.#conditions = validated({ ...PERFECT_NETWORK, ...options.network });
+    const replicaOptions = { registers: options.registers };
     for (const { id, clockSkewMs = 0 } of options.devices) {
       if (this.#replicas.has(id)) throw new Error(`Duplicate device id: ${id}`);
-      this.#replicas.set(id, new Replica(id, () => this.#now + clockSkewMs));
+      this.#replicas.set(id, new Replica(id, () => this.#now + clockSkewMs, replicaOptions));
     }
   }
 
@@ -119,9 +123,12 @@ export class Simulation {
   }
 
   edit(node: NodeId, record: RecordId, field: FieldName, value: FieldValue): Operation {
-    const op = this.replica(node).set(record, field, value);
-    this.events.push({ kind: 'edit', at: this.#now, op });
-    return op;
+    return this.#logEdit(this.replica(node).set(record, field, value));
+  }
+
+  /** Re-read every device's history under a different register strategy. */
+  setRegisterStrategy(strategy: RegisterStrategy): void {
+    for (const replica of this.#replicas.values()) replica.setRegisterStrategy(strategy);
   }
 
   setConditions(patch: Partial<NetworkConditions>): void {
@@ -268,6 +275,11 @@ export class Simulation {
       const applied = recipient.receive(message.payload.ops);
       this.events.push({ kind: 'deliver', at: this.#now, message, applied });
     }
+  }
+
+  #logEdit(op: Operation): Operation {
+    this.events.push({ kind: 'edit', at: this.#now, op });
+    return op;
   }
 
   #latency(): number {
