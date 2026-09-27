@@ -43,7 +43,7 @@ the claims.
 | 2 | Seeded network simulator: latency, loss, duplication, offline devices, partitions, settling | Done (PR #2) |
 | 3 | Switchable register strategies (wall-clock LWW, HLC LWW, multi-value conflicts); CRDTs: PN-counter, OR-set | Done (PR #3) |
 | 4 | Playground: three devices, network controls, message timeline, strategy switcher | Done (PR #4) |
-| 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | In progress: scenarios, write-up and live tabs in review; launch and portfolio card next |
+| 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | Done (PRs #5, #6), live on GitHub Pages; portfolio card next |
 
 ### 1. Engine core (done)
 
@@ -160,10 +160,16 @@ The first playground looked like a set of forms: the interesting behaviour
   tour that plays "Two health workers" by itself (skipped for shared `?seed=`
   links, pausable, shown once).
 
-Then:
+### Launch (done)
 
-- Make the repo public, enable Pages, check the live URL, README screenshot.
+- Repo public, GitHub Pages deploying from `main`, live at
+  <https://hemant10yadav.github.io/syncsim/> and checked in Chrome.
+- README rewritten around the live demo, with a screenshot.
+
+Next:
+
 - Add the syncsim project card to the portfolio.
+- Move the Playwright browser checks into the repo and run them in CI.
 
 ## Out of scope for now
 
