@@ -1,4 +1,5 @@
-import type { ExplainedOp, FieldName, FieldValue, NodeId, RegisterStrategy, Replica } from '@syncsim/engine'
+import type { ExplainedOp, FieldName, NodeId, RegisterStrategy, Replica } from '@syncsim/engine'
+import { describeChange, formatClock } from '../format'
 import { CASE } from '../world'
 
 interface WhyPanelProps {
@@ -27,7 +28,7 @@ export function WhyPanel({ replica, field, labelFor }: WhyPanelProps) {
           {history.map((entry) => (
             <li key={entry.op.id} className={`why__row why__row--${entry.verdict.kind}`}>
               <div className="why__head">
-                <span className="why__what">{describeChange(entry)}</span>
+                <span className="why__what">{describeChange(entry.op)}</span>
                 <span className={`why__badge why__badge--${entry.verdict.kind}`}>{badge(entry)}</span>
               </div>
               <div className="why__meta">
@@ -53,20 +54,6 @@ function summary(kind: ReturnType<Replica['kindOf']>, strategy: RegisterStrategy
       return 'Logical clock wins: the latest edit is shown, even over one it never saw.'
     case 'multi-value':
       return 'Keep conflicts: every edit nobody has replaced stays until someone picks one.'
-  }
-}
-
-function describeChange({ op }: ExplainedOp): string {
-  const c = op.change
-  switch (c.type) {
-    case 'set':
-      return `set to ${quote(c.value)}`
-    case 'increment':
-      return c.by >= 0 ? `+${c.by}` : `${c.by}`
-    case 'add':
-      return `added ${quote(c.element)}`
-    case 'remove':
-      return `removed ${quote(c.element)}`
   }
 }
 
@@ -112,14 +99,4 @@ function reason({ verdict }: ExplainedOp, strategy: RegisterStrategy, who: (id: 
   }
 }
 
-function formatClock(ms: number): string {
-  const sign = ms < 0 ? '−' : ''
-  const total = Math.abs(ms) / 1000
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = (total % 60).toFixed(1).padStart(4, '0')
-  return `${sign}${h}:${String(m).padStart(2, '0')}:${s}`
-}
-
-const quote = (v: FieldValue | string) => (typeof v === 'string' ? `“${v}”` : JSON.stringify(v))
 const list = (names: string[]) => [...new Set(names)].join(' and ')
