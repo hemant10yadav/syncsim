@@ -1,5 +1,6 @@
 import type { NetworkConditions, RegisterStrategy, Simulation } from '@syncsim/engine'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Scenario, ScenarioContext } from './scenarios'
 import {
   createWorld,
   DEFAULT_NETWORK,
@@ -11,6 +12,12 @@ import {
 
 /** Real ms of one frame are capped so a background tab does not jump minutes ahead. */
 const MAX_FRAME_MS = 100
+
+export interface ActiveScenario {
+  readonly scenario: Scenario
+  /** Index of the step whose caption is showing; its action has already run. */
+  readonly step: number
+}
 
 /**
  * Owns one Simulation and drives it in virtual time: every animation frame
@@ -29,6 +36,7 @@ export function useSimulation(initial: Setup) {
   const [speed, setSpeed] = useState(1)
   const [autoSync, setAutoSyncState] = useState(true)
   const [sim, setSim] = useState(() => createWorld(initial, 'lww-hlc', DEFAULT_NETWORK))
+  const [active, setActive] = useState<ActiveScenario | null>(null)
   const [, setVersion] = useState(0)
   // Tied to the Simulation it was scheduled for, so a frame of the previous world
   // that runs after a reset cannot push the new world's first sync far into the future.
@@ -75,8 +83,13 @@ export function useSimulation(initial: Setup) {
       setSetup(next)
       setSim(createWorld(next, strategy, network))
       setPartitionState('none')
+      if (active) {
+        // Leaving a scenario: hand syncing back to the timer.
+        setActive(null)
+        setAutoSyncState(true)
+      }
     },
-    [setup, strategy, network],
+    [setup, strategy, network, active],
   )
 
   const setStrategy = useCallback(
@@ -86,6 +99,54 @@ export function useSimulation(initial: Setup) {
     },
     [sim],
   )
+
+  const contextFor = useCallback(
+    (world: Simulation): ScenarioContext => ({
+      sim: world,
+      setStrategy: (next) => {
+        world.setRegisterStrategy(next)
+        setStrategyState(next)
+      },
+    }),
+    [],
+  )
+
+  /**
+   * Start a scenario from its own seed and settings, with auto-sync off so the
+   * steps alone decide when phones sync, and show its first step.
+   */
+  const startScenario = useCallback(
+    (scenario: Scenario) => {
+      const next = { seed: scenario.seed, mode: scenario.mode }
+      const world = createWorld(next, scenario.strategy, scenario.network)
+      scenario.steps[0]?.run?.(contextFor(world))
+      setSetup(next)
+      setSim(world)
+      setStrategyState(scenario.strategy)
+      setNetworkState(scenario.network)
+      setPartitionState('none')
+      setAutoSyncState(false)
+      setRunning(true)
+      setActive({ scenario, step: 0 })
+    },
+    [contextFor],
+  )
+
+  const nextStep = useCallback(() => {
+    if (!active) return
+    const step = active.step + 1
+    const next = active.scenario.steps[step]
+    if (!next) return
+    next.run?.(contextFor(sim))
+    setActive({ scenario: active.scenario, step })
+    refresh()
+  }, [active, sim, contextFor, refresh])
+
+  const exitScenario = useCallback(() => {
+    setActive(null)
+    nextGossip.current = { sim, at: sim.now + GOSSIP_INTERVAL_MS }
+    setAutoSyncState(true)
+  }, [sim])
 
   const setNetwork = useCallback(
     (patch: Partial<NetworkConditions>) => {
@@ -131,6 +192,10 @@ export function useSimulation(initial: Setup) {
     setSpeed,
     autoSync,
     setAutoSync,
+    scenario: active,
+    startScenario,
+    nextStep,
+    exitScenario,
   }
 }
 

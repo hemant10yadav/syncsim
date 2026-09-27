@@ -147,8 +147,8 @@ select {
 @media (min-width: 1100px) {
   .layout {
     grid-template-columns: 300px minmax(0, 1fr);
-    /* Phones, timeline, recipes; any extra height from the controls goes to the empty last row. */
-    grid-template-rows: auto auto auto 1fr;
+    /* Scenarios, phones, timeline, recipes; extra height from the controls goes to the empty last row. */
+    grid-template-rows: auto auto auto auto 1fr;
     align-items: start;
   }
 
@@ -174,6 +174,22 @@ select {
 
 .btn:hover {
   border-color: var(--accent);
+}
+
+.btn--primary {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn:disabled:hover {
+  border-color: var(--border);
 }
 
 .btn--small {
@@ -651,6 +667,101 @@ select option {
   gap: 12px;
   align-items: center;
   margin-bottom: 16px;
+}
+
+/* ── scenarios ─────────────────────────────────────────────────────────── */
+
+.scenarios__title,
+.scenario-player__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.scenarios__list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scenario-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scenario-card:hover,
+.scenario-card:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.scenario-card__title {
+  font-weight: 600;
+}
+
+.scenario-card__summary {
+  font-size: 13px;
+  color: var(--fg-3);
+}
+
+.scenario-card__cta {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.scenario-player {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+
+.scenario-player__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.scenario-player__progress {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scenario-player__progress li {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.scenario-player__progress li.is-done {
+  background: var(--accent);
+}
+
+.scenario-player__caption {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 /* ── recipes ───────────────────────────────────────────────────────────── */

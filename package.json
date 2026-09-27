@@ -11,7 +11,7 @@
     "build": "npm run build -w playground",
     "lint": "oxlint --deny-warnings",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm test -w @syncsim/engine"
+    "test": "npm test --workspaces --if-present"
   },
   "devDependencies": {
     "oxlint": "^1.85.0"

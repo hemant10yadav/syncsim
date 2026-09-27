@@ -4,6 +4,7 @@ import { useSimulation } from '../useSimulation'
 import { CASE, deviceLabel, DEVICES, seedFromUrl, writeSeedToUrl } from '../world'
 import { Controls } from './Controls'
 import { Phone, type PhoneActions, type PhoneView } from './Phone'
+import { ScenarioPanel } from './ScenarioPanel'
 import { Timeline } from './Timeline'
 
 /** Three simulated phones on a simulated network, with controls, scenarios and a message timeline. */
@@ -35,6 +36,7 @@ export function SimulatorView() {
       </div>
 
       <main className="layout">
+        <ScenarioPanel controls={controls} />
         <div className="phones">
           {DEVICES.map((d) => {
             const { view, actions } = simulatedPhone(sim, d.id, act)
