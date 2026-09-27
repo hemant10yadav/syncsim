@@ -1,5 +1,6 @@
-import type { Message, NodeId, SimEvent, Simulation } from '@syncsim/engine'
-import { useEffect, useRef, useState } from 'react'
+import type { NodeId, Simulation } from '@syncsim/engine'
+import { collectTraffic, type Flight } from '../flights'
+import { useWidth } from '../useWidth'
 import { DEVICES } from '../world'
 
 const HEIGHT = 190
@@ -10,13 +11,6 @@ const LANE_GAP = 60
 const COMPACT_WIDTH = 560
 
 const laneY = (id: NodeId) => TOP + DEVICES.findIndex((d) => d.id === id) * LANE_GAP
-
-type Outcome = { kind: 'delivered'; applied: number } | { kind: 'dropped' } | { kind: 'in-flight' }
-
-interface Flight {
-  message: Message
-  outcome: Outcome
-}
 
 /**
  * Sequence diagram of the last few seconds of virtual time: one lane per phone,
@@ -32,7 +26,7 @@ export function Timeline({ sim }: { sim: Simulation }) {
   const x = (t: number) => left + ((t - start) / windowMs) * (width - left - RIGHT)
   const ticks = compact ? [0, 4_000, 8_000] : [0, 5_000, 10_000, 15_000]
 
-  const { flights, blocked, edits } = collect(sim.events, start - sim.conditions.maxLatencyMs, now)
+  const { flights, blocked, edits } = collectTraffic(sim.events, start - sim.conditions.maxLatencyMs, now)
 
   return (
     <div ref={ref} className="timeline">
@@ -138,47 +132,4 @@ function Cross({ cx, cy }: { cx: number; cy: number }) {
   return (
     <path className="tl-cross" d={`M${cx - s} ${cy - s} L${cx + s} ${cy + s} M${cx - s} ${cy + s} L${cx + s} ${cy - s}`} />
   )
-}
-
-type EditEvent = Extract<SimEvent, { kind: 'edit' }>
-type DropEvent = Extract<SimEvent, { kind: 'drop' }>
-
-/** Walk the event log backwards until `since`, pairing each sent message with what became of it. */
-function collect(events: readonly SimEvent[], since: number, now: number) {
-  const sent = new Map<number, Message>()
-  const outcomes = new Map<number, Outcome>()
-  const blocked: DropEvent[] = []
-  const edits: EditEvent[] = []
-  for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i]!
-    if (e.at < since) break
-    if (e.kind === 'edit') edits.push(e)
-    else if (e.kind === 'send') sent.set(e.message.id, e.message)
-    else if (e.kind === 'deliver') outcomes.set(e.message.id, { kind: 'delivered', applied: e.applied.length })
-    else if (e.reason === 'lost' || e.message.deliverAt > e.message.sentAt) {
-      // Lost in transit, or its link went down while it was in the air.
-      outcomes.set(e.message.id, { kind: 'dropped' })
-    } else {
-      // Refused before leaving: the sender was offline, or the link was partitioned.
-      blocked.push(e)
-    }
-  }
-  const flights: Flight[] = [...sent.values()].map((message) => ({
-    message,
-    outcome: outcomes.get(message.id) ?? (message.deliverAt > now ? { kind: 'in-flight' } : { kind: 'dropped' }),
-  }))
-  return { flights, blocked, edits }
-}
-
-function useWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null)
-  const [width, setWidth] = useState(0)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.floor(entry!.contentRect.width)))
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-  return [width, ref] as const
 }

@@ -176,6 +176,13 @@ export class Simulation {
     return !this.#offline.has(node);
   }
 
+  /** Whether a message sent from `from` to `to` right now could arrive. */
+  reachable(from: NodeId, to: NodeId): boolean {
+    this.replica(from);
+    this.replica(to);
+    return this.#canReach(from, to) === undefined;
+  }
+
   /** Split devices into groups that cannot reach each other. Unlisted devices are cut off from everyone. */
   partition(groups: readonly (readonly NodeId[])[]): void {
     const assignment = new Map<NodeId, number>();

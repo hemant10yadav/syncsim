@@ -27,16 +27,24 @@ export interface ActiveScenario {
  * The Simulation is mutable, so every change goes through `act`, which bumps a
  * counter to re-render.
  */
-export function useSimulation(initial: Setup) {
-  const [setup, setSetup] = useState(initial)
-  const [strategy, setStrategyState] = useState<RegisterStrategy>('lww-hlc')
-  const [network, setNetworkState] = useState<NetworkConditions>(DEFAULT_NETWORK)
+export function useSimulation(initial: Setup, tour: Scenario | null = null) {
+  // With a tour, start inside that scenario, playing itself, rather than switching to it after mounting.
+  const [setup, setSetup] = useState<Setup>(tour ? { seed: tour.seed, mode: tour.mode } : initial)
+  const [strategy, setStrategyState] = useState<RegisterStrategy>(tour?.strategy ?? 'lww-hlc')
+  const [network, setNetworkState] = useState<NetworkConditions>(tour?.network ?? DEFAULT_NETWORK)
   const [partition, setPartitionState] = useState<PartitionId>('none')
   const [running, setRunning] = useState(true)
   const [speed, setSpeed] = useState(1)
-  const [autoSync, setAutoSyncState] = useState(true)
-  const [sim, setSim] = useState(() => createWorld(initial, 'lww-hlc', DEFAULT_NETWORK))
-  const [active, setActive] = useState<ActiveScenario | null>(null)
+  const [autoSync, setAutoSyncState] = useState(!tour)
+  const [sim, setSim] = useState(() => {
+    if (!tour) return createWorld(initial, 'lww-hlc', DEFAULT_NETWORK)
+    const world = createWorld({ seed: tour.seed, mode: tour.mode }, tour.strategy, tour.network)
+    tour.steps[0]?.run?.({ sim: world, setStrategy: (next) => world.setRegisterStrategy(next) })
+    return world
+  })
+  const [active, setActive] = useState<ActiveScenario | null>(tour ? { scenario: tour, step: 0 } : null)
+  /** Whether the active scenario advances by itself. */
+  const [autoplay, setAutoplay] = useState(!!tour)
   const [, setVersion] = useState(0)
   // Tied to the Simulation it was scheduled for, so a frame of the previous world
   // that runs after a reset cannot push the new world's first sync far into the future.
@@ -116,7 +124,7 @@ export function useSimulation(initial: Setup) {
    * steps alone decide when phones sync, and show its first step.
    */
   const startScenario = useCallback(
-    (scenario: Scenario) => {
+    (scenario: Scenario, { autoplay: play = false } = {}) => {
       const next = { seed: scenario.seed, mode: scenario.mode }
       const world = createWorld(next, scenario.strategy, scenario.network)
       scenario.steps[0]?.run?.(contextFor(world))
@@ -128,6 +136,7 @@ export function useSimulation(initial: Setup) {
       setAutoSyncState(false)
       setRunning(true)
       setActive({ scenario, step: 0 })
+      setAutoplay(play)
     },
     [contextFor],
   )
@@ -144,6 +153,7 @@ export function useSimulation(initial: Setup) {
 
   const exitScenario = useCallback(() => {
     setActive(null)
+    setAutoplay(false)
     nextGossip.current = { sim, at: sim.now + GOSSIP_INTERVAL_MS }
     setAutoSyncState(true)
   }, [sim])
@@ -193,6 +203,8 @@ export function useSimulation(initial: Setup) {
     autoSync,
     setAutoSync,
     scenario: active,
+    autoplay,
+    setAutoplay,
     startScenario,
     nextStep,
     exitScenario,

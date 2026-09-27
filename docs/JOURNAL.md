@@ -298,3 +298,81 @@ happened, why it mattered, and what changed.
   and status resolve by the strategy, and the visit counter shows 2. It is a
   demo seeding shortcut, not a sync bug, so it is documented rather than
   engineered away.
+
+## UI upgrade: network view and "why this value?"
+
+### The first playground looked basic
+
+- **Faced:** It worked, but read as forms plus a chart. Messages moving,
+  getting lost and arriving twice, the thing the project is about, happened
+  in a small timeline under the phones, and nothing explained why a value won.
+- **Resolved:** A network view where messages visibly travel between the
+  phones and links visibly break, and a "why?" panel on every field that marks
+  silently lost edits in red. Both read data the engine already had; the only
+  engine additions are `Replica.explain` and `Simulation.reachable`.
+
+### "Replaced" is not the same as "lost"
+
+- **Faced:** Under last-write-wins, both an edit someone saw and changed, and
+  an edit nobody ever saw, end up hidden. Showing both as "lost" would blame
+  the engine for normal editing.
+- **Resolved:** `supersedes` already records what each writer saw. An edit
+  listed there is **replaced**; an edit that is neither standing nor replaced
+  was discarded without anyone seeing it, and only that is **silently lost**.
+
+### Shared traffic logic, and its order
+
+- **Faced:** The timeline and the network view both need "what became of each
+  message". Duplicating the backwards walk over the event log would let the two
+  views disagree.
+- **Resolved:** `flights.ts` (`collectTraffic`) serves both and now records
+  when each message was dropped or delivered. Its first test caught that it
+  returned messages newest first; it now returns every list oldest first.
+
+### An accessible name that clashed with a form field
+
+- **Faced:** The browser test could not select "Status on Phone A": the new
+  why button was named "Why is status on Phone A this value?", which contains
+  the same text. Screen reader users would hit the same ambiguity.
+- **Resolved:** The button is named "Explain the status value on Phone A".
+
+### A warning colour overridden by the open state
+
+- **Faced:** The "why? · 1 lost" button turned from red to the accent colour
+  when opened, because the open-state rule was more specific.
+- **Resolved:** The lost style uses a more specific selector, so a lost edit
+  stays red whether the panel is open or not.
+
+### Same edits, three rules, without switching
+
+- **Faced:** The difference between strategies only showed if a visitor knew
+  to flip the switch and remembered what it said before.
+- **Resolved:** The comparison table reads the same ops under all three
+  strategies at once, using the engine's own `standingWrites` and
+  `explainField`, so it cannot drift from what the phones display.
+
+### A flash that does not steal focus
+
+- **Faced:** Highlighting a value when it changes is easiest by remounting the
+  field, but remounting a select or input takes focus away from a keyboard user
+  mid-edit.
+- **Resolved:** Only an empty overlay is keyed by the value, so React mounts a
+  fresh overlay and its CSS animation plays once while the inputs stay put. It
+  is switched off under `prefers-reduced-motion`.
+
+### A tour that plays on first visit, without an effect setting state
+
+- **Faced:** Starting the tour from an effect after mounting would set state
+  inside an effect, which lint rejects, and would flash the normal view first.
+- **Resolved:** `useSimulation` takes an optional scenario and starts inside it:
+  every piece of state is initialised from the scenario. The tour is chosen once
+  (`useState(firstVisitTour)`), skipped for `?seed=` links so shared runs open
+  exactly as shared, and remembered in `localStorage`, guarded because storage
+  can be blocked.
+
+### Two buttons with the same name
+
+- **Faced:** The comparison rows and the strategy control both had a button
+  named "Keep conflicts"; the browser test could not tell them apart, and
+  neither could a screen reader user.
+- **Resolved:** The row buttons are named "Use Keep conflicts" and so on.

@@ -1,6 +1,7 @@
-import { counterValue, liveAdds, orSetElements, type IncrementOperation, type SetElementOperation } from './crdt';
+import { counterValue, isIncrement, isSetElement, liveAdds, orSetElements } from './crdt';
+import { explainField, type ExplainedOp } from './explain';
 import { compareTimestamps, HybridClock } from './hlc';
-import { standingWrites, unreplaced, type RegisterStrategy, type SetOperation } from './registers';
+import { isSet, standingWrites, unreplaced, type RegisterStrategy, type SetOperation } from './registers';
 import type {
   Change,
   Conflict,
@@ -171,6 +172,11 @@ export class Replica {
     return Object.fromEntries(sortedKeys(this.#fieldOps).map((record) => [record, this.read(record)!]));
   }
 
+  /** Every edit to a field, oldest first, with what became of it under the current strategy. */
+  explain(record: RecordId, field: FieldName): ExplainedOp[] {
+    return explainField(this.kindOf(field), this.#strategy, this.#fieldOps.get(record)?.get(field) ?? []);
+  }
+
   /** The write currently displayed for a register field, for explaining why a value is what it is. */
   winner(record: RecordId, field: FieldName): SetOperation | undefined {
     return this.#standing(record, field)[0];
@@ -206,6 +212,11 @@ export class Replica {
     if (actual !== kind) throw new TypeError(`Cannot ${method} "${field}": it is a ${actual} field`);
   }
 
+  /**
+   * Ops of one field that match `guard`. Ops whose change does not match the field's
+   * kind (possible only if replicas disagree on the schema) are ignored by every
+   * replica alike, so state still converges.
+   */
   #opsOf<T extends Operation>(record: RecordId, field: FieldName, guard: (op: Operation) => op is T): T[] {
     return (this.#fieldOps.get(record)?.get(field) ?? []).filter(guard);
   }
@@ -260,9 +271,3 @@ export class Replica {
  */
 const sortedKeys = <K extends string>(map: ReadonlyMap<K, unknown>): K[] => [...map.keys()].sort();
 
-// Ops whose change does not match the field's kind (possible only if replicas
-// disagree on the schema) are ignored by every replica alike, so state still converges.
-const isSet = (op: Operation): op is SetOperation => op.change.type === 'set';
-const isIncrement = (op: Operation): op is IncrementOperation => op.change.type === 'increment';
-const isSetElement = (op: Operation): op is SetElementOperation =>
-  op.change.type === 'add' || op.change.type === 'remove';

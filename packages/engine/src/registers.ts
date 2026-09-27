@@ -3,6 +3,8 @@ import type { Change, OpId, Operation } from './types';
 
 export type SetOperation = Operation<Extract<Change, { type: 'set' }>>;
 
+export const isSet = (op: Operation): op is SetOperation => op.change.type === 'set';
+
 /**
  * How a register field picks its value when writes are concurrent.
  * - `lww-wall`: latest device clock wins. Naive; a device with a fast clock wins

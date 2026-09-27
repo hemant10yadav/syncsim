@@ -3,6 +3,10 @@ import type { Change, OpId, Operation } from './types';
 export type IncrementOperation = Operation<Extract<Change, { type: 'increment' }>>;
 export type SetElementOperation = Operation<Extract<Change, { type: 'add' | 'remove' }>>;
 
+export const isIncrement = (op: Operation): op is IncrementOperation => op.change.type === 'increment';
+export const isSetElement = (op: Operation): op is SetElementOperation =>
+  op.change.type === 'add' || op.change.type === 'remove';
+
 /**
  * PN-counter: the value is the sum of every increment (negative for decrements).
  * Each increment is its own op and the log applies each op once, so concurrent
