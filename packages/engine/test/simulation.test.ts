@@ -142,6 +142,18 @@ describe('Simulation', () => {
     expect(run(42)).not.toEqual(run(43));
   });
 
+  it('reports whether a link is up', () => {
+    const s = sim();
+    expect(s.reachable('a', 'b')).toBe(true);
+    s.setOnline('b', false);
+    expect(s.reachable('a', 'b')).toBe(false);
+    s.setOnline('b', true);
+    s.partition([['a'], ['b', 'c']]);
+    expect(s.reachable('a', 'b')).toBe(false);
+    expect(s.reachable('b', 'c')).toBe(true);
+    expect(() => s.reachable('a', 'zz')).toThrow(/Unknown/);
+  });
+
   it('rejects impossible network conditions', () => {
     expect(() => sim({ network: { minLatencyMs: 200, maxLatencyMs: 100 } })).toThrow(RangeError);
     expect(() => sim().setConditions({ dropRate: 1.5 })).toThrow(RangeError);
