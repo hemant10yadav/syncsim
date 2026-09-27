@@ -28,7 +28,7 @@ describe('convergence', () => {
   it('every device ends with identical data once all ops are exchanged, whatever the edits, sync order and clock skew', () => {
     fc.assert(
       fc.property(
-        fc.array(command, { maxLength: 60 }),
+        fc.array(command, { minLength: 10, maxLength: 80, size: 'max' }),
         fc.tuple(...NODES.map(() => fc.integer({ min: -3_600_000, max: 3_600_000 }))),
         (commands, skews) => {
           let t = 0;
