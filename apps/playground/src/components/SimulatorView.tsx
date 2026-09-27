@@ -82,6 +82,7 @@ function simulatedPhone(
       replica: sim.replica(id),
       online: sim.isOnline(id),
       clockSkew: sim.clockSkew(id),
+      clock: sim.now + sim.clockSkew(id),
       labelFor: deviceLabel,
     },
     actions: {

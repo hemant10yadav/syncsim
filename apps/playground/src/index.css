@@ -357,11 +357,47 @@ select option {
   display: grid;
   gap: 14px;
   align-content: start;
-  padding: 16px;
+  padding: 10px 16px 16px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 30px;
   background: var(--bg-surface);
+  /* A bezel, so the panel reads as a device rather than a form. */
+  box-shadow:
+    0 0 0 5px var(--bg-chrome),
+    0 0 0 6px var(--border),
+    0 12px 30px rgba(0, 0, 0, 0.25);
+  margin: 6px;
   transition: opacity 0.2s, border-color 0.2s;
+}
+
+.phone__statusbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 18px;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.phone__statusbar > :last-child {
+  justify-self: end;
+}
+
+.phone__notch {
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-chrome);
+}
+
+.phone__signal {
+  fill: var(--ok);
+}
+
+.phone__signal--off {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
 }
 
 .phone--offline {
@@ -416,8 +452,29 @@ select option {
 }
 
 .field {
+  position: relative;
   display: grid;
   gap: 6px;
+}
+
+/* Plays once each time the value changes (the element is remounted). */
+.field__flash {
+  position: absolute;
+  inset: -6px -8px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  animation: field-flash 1.2s ease-out;
+}
+
+@keyframes field-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .field__label {
@@ -1296,5 +1353,9 @@ select option {
 @media (prefers-reduced-motion: reduce) {
   .phone {
     transition: none;
+  }
+
+  .field__flash {
+    animation: none;
   }
 }

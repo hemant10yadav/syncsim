@@ -1,5 +1,6 @@
 import type { Conflict, FieldName, FieldValue, NodeId, Replica } from '@syncsim/engine'
 import { useState, type ReactNode } from 'react'
+import { formatClock } from '../format'
 import { CASE, SKEW_OPTIONS, STATUS_OPTIONS, TAG_OPTIONS } from '../world'
 import { EditLog } from './EditLog'
 import { WhyPanel } from './WhyPanel'
@@ -11,6 +12,8 @@ export interface PhoneView {
   readonly online: boolean
   /** Omitted for a device on a real clock, which hides the clock control. */
   readonly clockSkew?: number
+  /** The device's own clock reading in ms, shown in its status bar. */
+  readonly clock?: number
   /** Extra status text, such as how many peers a tab can see. */
   readonly detail?: string
   readonly labelFor: (node: NodeId) => string
@@ -27,7 +30,7 @@ export interface PhoneActions {
 }
 
 export function Phone({ view, actions }: { view: PhoneView; actions: PhoneActions }) {
-  const { title, replica, online, clockSkew, detail, labelFor } = view
+  const { title, replica, online, clockSkew, clock, detail, labelFor } = view
   const [why, setWhy] = useState<FieldName | null>(null)
   const label = (field: FieldName, text: string, badge?: ReactNode) => (
     <FieldLabel
@@ -51,6 +54,11 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
 
   return (
     <article className={`phone${online ? '' : ' phone--offline'}`} aria-label={title}>
+      <div className="phone__statusbar" aria-hidden>
+        <span className="mono">{clock !== undefined ? formatClock(clock) : ''}</span>
+        <span className="phone__notch" />
+        <Signal online={online} />
+      </div>
       <header className="phone__header">
         <div>
           <h2 className="phone__title">{title}</h2>
@@ -79,6 +87,7 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
       )}
 
       <div className="field">
+        <Flash on={replica.value(CASE, 'name')} />
         {label('name', 'Patient')}
         <TextField
           value={name}
@@ -90,6 +99,7 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
       </div>
 
       <div className="field">
+        <Flash on={replica.value(CASE, 'status')} />
         {label('status', 'Status')}
         <select
           aria-label={`Status on ${title}`}
@@ -110,6 +120,7 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
       </div>
 
       <div className="field">
+        <Flash on={replica.value(CASE, 'visits')} />
         {label('visits', 'Visits', <KindBadge crdt={replica.kindOf('visits') === 'counter'} crdtName="counter" />)}
         <div className="field__row">
           <span className="visits">{typeof visits === 'number' ? visits : 0}</span>
@@ -121,6 +132,7 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
       </div>
 
       <div className="field">
+        <Flash on={replica.value(CASE, 'tags')} />
         {label('tags', 'Tags', <KindBadge crdt={replica.kindOf('tags') === 'set'} crdtName="set" />)}
         <ul className="tags">
           {tags.map((tag) => (
@@ -198,6 +210,26 @@ function ConflictPicker({ conflict, labelFor, onPick }: ConflictPickerProps) {
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * A highlight that plays whenever `on` changes: keyed by the value, so React mounts
+ * a fresh element and its CSS animation runs once. Only the overlay remounts, so
+ * the field's inputs keep focus.
+ */
+function Flash({ on }: { on: unknown }) {
+  return <span key={JSON.stringify(on) ?? 'none'} className="field__flash" aria-hidden />
+}
+
+function Signal({ online }: { online: boolean }) {
+  if (!online) return <span className="phone__signal phone__signal--off">no signal</span>
+  return (
+    <svg className="phone__signal" width="18" height="12" viewBox="0 0 18 12">
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={i} x={i * 5} y={9 - i * 3} width="3" height={3 + i * 3} rx="1" />
+      ))}
+    </svg>
   )
 }
 
