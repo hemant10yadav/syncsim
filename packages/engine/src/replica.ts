@@ -1,4 +1,5 @@
 import { counterValue, isIncrement, isSetElement, liveAdds, orSetElements } from './crdt';
+import { explainField, type ExplainedOp } from './explain';
 import { compareTimestamps, HybridClock } from './hlc';
 import { isSet, standingWrites, unreplaced, type RegisterStrategy, type SetOperation } from './registers';
 import type {
@@ -169,6 +170,11 @@ export class Replica {
 
   snapshot(): Snapshot {
     return Object.fromEntries(sortedKeys(this.#fieldOps).map((record) => [record, this.read(record)!]));
+  }
+
+  /** Every edit to a field, oldest first, with what became of it under the current strategy. */
+  explain(record: RecordId, field: FieldName): ExplainedOp[] {
+    return explainField(this.kindOf(field), this.#strategy, this.#fieldOps.get(record)?.get(field) ?? []);
   }
 
   /** The write currently displayed for a register field, for explaining why a value is what it is. */

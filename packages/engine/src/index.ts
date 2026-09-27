@@ -5,6 +5,8 @@ export const ENGINE_VERSION = '0.0.0';
 
 export { counterValue, isIncrement, isSetElement, liveAdds, orSetElements } from './crdt';
 export type { IncrementOperation, SetElementOperation } from './crdt';
+export { explainField } from './explain';
+export type { ExplainedOp, Verdict } from './explain';
 export { compareTimestamps, HybridClock } from './hlc';
 export type { Timestamp } from './hlc';
 export { isSet, REGISTER_STRATEGIES, standingWrites, unreplaced } from './registers';
