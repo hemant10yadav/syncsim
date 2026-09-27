@@ -42,8 +42,8 @@ the claims.
 | 1 | Hybrid logical clock, op log, replica, per-field last-write-wins, version-vector sync, CI | Done (PR #1) |
 | 2 | Seeded network simulator: latency, loss, duplication, offline devices, partitions, settling | Done (PR #2) |
 | 3 | Switchable register strategies (wall-clock LWW, HLC LWW, multi-value conflicts); CRDTs: PN-counter, OR-set | Done (PR #3) |
-| 4 | Playground: three devices, network controls, message timeline, strategy switcher | In review |
-| 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | Next |
+| 4 | Playground: three devices, network controls, message timeline, strategy switcher | Done (PR #4) |
+| 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | In progress: scenarios, write-up and live tabs in review; launch and portfolio card next |
 
 ### 1. Engine core (done)
 
@@ -95,7 +95,7 @@ the claims.
   (`test/strategies.test.ts`), and the network property test now covers all
   strategies, counters and sets, and checks no increment is ever lost.
 
-### 4. Playground (in review)
+### 4. Playground (done)
 
 - `apps/playground`, React + Vite, styled with the portfolio's colour tokens
   and fonts, dark and light themes.
@@ -114,13 +114,30 @@ the claims.
 - Engine additions for the UI: send events carry the real delivery time, and
   `Simulation.setClockSkew` changes a device clock mid-run.
 
-### 5. Polish (next)
+### 5. Polish (in progress)
 
-- Preset scenarios: "Two health workers edit the same case", "The clock
-  liar", "Duplicate delivery", each with step-by-step replay.
-- `docs/APPROACH.md` design write-up.
-- Real two-tab sync over BroadcastChannel.
-- Make the repo public, enable Pages, add the project card to the portfolio.
+Done, in review:
+
+- Guided scenarios (`apps/playground/src/scenarios.ts`), each with a fixed
+  seed, a lossless network and auto-sync off so they play out the same way
+  every time: "Two health workers edit the same case", "The clock liar",
+  "Offline visits get lost", "Counters keep every visit", "Duplicate
+  delivery". Step-by-step player with Next, Restart and Exit.
+- `scenarios.test.ts` plays every scenario without the UI and checks its
+  captions are true after each step. The playground now has its own vitest
+  suite, and the root `npm test` runs every workspace.
+- `docs/APPROACH.md`: design write-up, trade-offs, and where it would break in
+  production.
+- Live tabs (`?view=live`): each browser tab is a real device.
+  `LiveSession` runs the same pull protocol over BroadcastChannel, plus an
+  immediate push of fresh edits. Tested with an in-memory bus.
+- `Phone` takes a view and actions instead of a `Simulation`, so the same
+  panel renders simulated phones and real tabs.
+
+Next:
+
+- Make the repo public, enable Pages, check the live URL, README screenshot.
+- Add the syncsim project card to the portfolio.
 
 ## Out of scope for now
 
