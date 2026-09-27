@@ -40,9 +40,9 @@ the claims.
 | # | Milestone | Status |
 |---|---|---|
 | 1 | Hybrid logical clock, op log, replica, per-field last-write-wins, version-vector sync, CI | Done (PR #1) |
-| 2 | Seeded network simulator: latency, loss, duplication, offline devices, partitions, settling | In review (PR #2) |
-| 3 | Vector clocks that surface real conflicts; CRDTs: LWW map, PN-counter, OR-set | Next |
-| 4 | Playground: three devices, network controls, message timeline, strategy switcher | Planned |
+| 2 | Seeded network simulator: latency, loss, duplication, offline devices, partitions, settling | Done (PR #2) |
+| 3 | Switchable register strategies (wall-clock LWW, HLC LWW, multi-value conflicts); CRDTs: PN-counter, OR-set | In review |
+| 4 | Playground: three devices, network controls, message timeline, strategy switcher | Next |
 | 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | Planned |
 
 ### 1. Engine core (done)
@@ -56,7 +56,7 @@ the claims.
 - CI (`.github/workflows/ci.yml`): oxlint, typecheck, tests and build on every
   PR.
 
-### 2. Network simulator (in review)
+### 2. Network simulator (done)
 
 - `Simulation` (`src/simulation.ts`): virtual time; nothing happens until
   `advance()` moves the clock.
@@ -69,19 +69,33 @@ the claims.
 - Full event log (`edit`, `send`, `drop`, `deliver`) for the playground to
   animate.
 
-### 3. Conflict-aware strategies (next)
+### 3. Conflict-aware strategies (in review)
 
-- Make the merge rule pluggable instead of hard-wired LWW.
-- Wall-clock LWW as the naive baseline, to show clock drift losing data.
-- Vector clocks: detect true concurrency and keep both values as a conflict
-  the user resolves, instead of silently picking one.
-- CRDTs for fields where "last write" is the wrong question:
-  - PN-counter for visit counts (concurrent increments are never lost)
-  - OR-set for tags (add and remove from different devices without
-    resurrecting or losing items)
-- Per-strategy tests that pin down exactly which updates each one loses.
+- A schema gives each field a kind: `register`, `counter` or `set`
+  (`src/types.ts`). Unlisted fields are registers.
+- State is derived from the log on demand, so the register strategy can be
+  switched at any time and the same history is re-read under the new rule
+  (`Replica.setRegisterStrategy`, `Simulation.setRegisterStrategy`).
+- Register strategies (`src/registers.ts`):
+  - `lww-wall`: latest device clock wins. The naive baseline that lets a
+    fast clock beat newer edits.
+  - `lww-hlc`: latest hybrid logical clock wins. Respects "saw it, then
+    changed it", still drops one of two concurrent writes.
+  - `multi-value`: every write lists the values it replaces (`supersedes`);
+    anything not replaced stays standing, so concurrent writes surface as a
+    `Conflict` until someone writes a resolution.
+- CRDTs (`src/crdt.ts`):
+  - PN-counter for visit counts: concurrent increments are never lost.
+  - OR-set for tags: a remove cancels only the adds it had seen, so a
+    concurrent add wins and removed tags can come back.
+- Naive app behaviour for comparison: `increment` and `addElement` on a
+  register field read the value and write it back, which is exactly how
+  real apps lose concurrent updates.
+- Tests pin down what each strategy keeps and loses
+  (`test/strategies.test.ts`), and the network property test now covers all
+  strategies, counters and sets, and checks no increment is ever lost.
 
-### 4. Playground (planned)
+### 4. Playground (next)
 
 - Three phone panels editing one "patient case" record.
 - Online/offline toggle per device, sliders for latency, loss and clock skew,
