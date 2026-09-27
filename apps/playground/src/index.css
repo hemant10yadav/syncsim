@@ -1199,6 +1199,100 @@ select option {
   color: var(--ok);
 }
 
+/* ── edit log ──────────────────────────────────────────────────────────── */
+
+.log {
+  border-top: 1px solid var(--border-2);
+  padding-top: 10px;
+}
+
+.log__summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+
+.log__summary:hover {
+  color: var(--accent);
+}
+
+.log__body {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.log__vector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin: 0;
+  font-size: 11px;
+}
+
+.log__vector-label {
+  color: var(--fg-4);
+}
+
+.log__chip {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--fg-2);
+}
+
+.log__list {
+  display: grid;
+  gap: 2px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.log__row {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 0 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.log__row.is-own {
+  background: var(--bg-card);
+}
+
+.log__id {
+  grid-row: span 2;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--fg-3);
+}
+
+.log__what {
+  color: var(--fg);
+}
+
+.log__from {
+  font-size: 11px;
+  color: var(--fg-4);
+}
+
+.log__gap {
+  color: var(--edit);
+  font-weight: 600;
+}
+
+.log__more {
+  margin: 0;
+  font-size: 11px;
+  color: var(--fg-4);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .phone {
     transition: none;

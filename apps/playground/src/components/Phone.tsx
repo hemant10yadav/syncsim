@@ -1,6 +1,7 @@
 import type { Conflict, FieldName, FieldValue, NodeId, Replica } from '@syncsim/engine'
 import { useState, type ReactNode } from 'react'
 import { CASE, SKEW_OPTIONS, STATUS_OPTIONS, TAG_OPTIONS } from '../world'
+import { EditLog } from './EditLog'
 import { WhyPanel } from './WhyPanel'
 
 /** What a phone panel shows. The same panel renders a simulated device or a real browser tab. */
@@ -151,6 +152,7 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
         </div>
         {whyFor('tags')}
       </div>
+      <EditLog replica={replica} labelFor={labelFor} />
     </article>
   )
 }
