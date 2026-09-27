@@ -5,4 +5,15 @@ export const ENGINE_VERSION = '0.0.0';
 
 export { compareTimestamps, HybridClock } from './hlc';
 export type { Timestamp } from './hlc';
-export type { NodeId } from './types';
+export { Replica } from './replica';
+export type {
+  FieldName,
+  FieldValue,
+  NodeId,
+  OpId,
+  Operation,
+  RecordId,
+  RecordState,
+  Snapshot,
+  VersionVector,
+} from './types';
