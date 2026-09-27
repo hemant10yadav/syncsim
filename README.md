@@ -9,7 +9,7 @@ or fail, under a hostile network: delayed, dropped, duplicated and reordered
 messages, partitions, and clocks that lie.
 
 **[▶ Open the live demo](https://hemant10yadav.github.io/syncsim/)** ·
-[How it works](docs/APPROACH.md) ·
+[How it works](https://hemant10yadav.github.io/syncsim/approach/) ·
 [Build journal](docs/JOURNAL.md)
 
 [![CI](https://github.com/hemant10yadav/syncsim/actions/workflows/ci.yml/badge.svg)](https://github.com/hemant10yadav/syncsim/actions/workflows/ci.yml)
