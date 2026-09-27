@@ -461,6 +461,266 @@ html {
   color: var(--danger);
 }
 
+/* ── 3. key idea ───────────────────────────────────────────────────────── */
+
+.key {
+  display: grid;
+  gap: 20px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+@media (min-width: 860px) {
+  .key {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .key .ap-figcaption {
+    grid-column: 1 / -1;
+  }
+}
+
+.key__graph {
+  display: grid;
+  gap: 12px;
+}
+
+.key__tier {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.key__card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  transition: border-color 0.25s, opacity 0.25s;
+}
+
+.key__card.is-standing {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.key__card.is-replaced {
+  opacity: 0.75;
+}
+
+.key__card.is-replaced .key__value {
+  text-decoration: line-through;
+  text-decoration-color: var(--fg-3);
+}
+
+.key__card-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+
+.key__badge {
+  font-weight: 600;
+}
+
+.key__badge.is-standing {
+  color: var(--ok);
+}
+
+.key__value {
+  font: 700 20px Outfit, Inter, sans-serif;
+}
+
+.key__label {
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+.key__supersedes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 12px;
+}
+
+.key__ref {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--edit);
+}
+
+.key__delivery {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-chrome);
+}
+
+.key__delivery-head {
+  display: grid;
+  gap: 8px;
+}
+
+.key__h3 {
+  margin: 0;
+  font: 600 15px Outfit, Inter, sans-serif;
+}
+
+.key__order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: arrival;
+}
+
+.key__chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  font-size: 13px;
+  animation: chip-in 0.3s ease-out;
+}
+
+.key__chip::before {
+  counter-increment: arrival;
+  content: counter(arrival) '. ';
+  color: var(--fg-3);
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.ap .key__result {
+  margin: 0;
+  color: var(--fg);
+}
+
+.key__same {
+  display: block;
+  margin-top: 4px;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.key__same.is-waiting {
+  font-weight: 500;
+  color: var(--fg-3);
+}
+
+/* ── 4. strategies ─────────────────────────────────────────────────────── */
+
+.strats {
+  display: grid;
+  gap: 16px;
+  max-width: var(--wide);
+  margin: 24px 0;
+}
+
+@media (min-width: 860px) {
+  .strats {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.strats__card {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  background: var(--bg-surface);
+}
+
+.strats__title {
+  margin: 0 0 4px;
+  font: 600 17px Outfit, Inter, sans-serif;
+}
+
+.ap .strats__story {
+  font-size: 14px;
+}
+
+.strats__table,
+.planted {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.strats__table th,
+.strats__table td,
+.planted th,
+.planted td {
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--border-2);
+  text-align: left;
+  vertical-align: top;
+}
+
+.strats__table thead th,
+.planted thead th {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.strats__table tbody th {
+  font-weight: 600;
+}
+
+.strats__table td.is-conflict {
+  color: var(--edit);
+  font-weight: 600;
+}
+
+.strats__table td.is-lost {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.strats__table td.is-kept {
+  color: var(--ok);
+}
+
+.strats__how {
+  display: grid;
+  gap: 10px;
+  max-width: var(--measure);
+  margin: 0 0 18px;
+}
+
+.strats__how div {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 12px;
+  font-size: 15px;
+}
+
+.strats__how dt {
+  font-weight: 600;
+}
+
+.strats__how dd {
+  margin: 0;
+  color: var(--fg-2);
+}
+
 /* ── footer ────────────────────────────────────────────────────────────── */
 
 .ap-footer {
