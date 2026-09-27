@@ -25,10 +25,7 @@ npm run typecheck  # engine type check
 npm run build      # production build of the playground
 ```
 
-## Roadmap
+## Docs
 
-1. Hybrid logical clock, operation log, replica, last-write-wins
-2. Seeded simulated network and convergence property tests
-3. Vector clocks and CRDTs (LWW map, PN-counter, OR-set)
-4. Playground: three devices, network controls, message timeline
-5. Scenarios, design write-up (`APPROACH.md`), cross-tab sync via BroadcastChannel
+- [Plan](docs/PLAN.md): goals, ground rules, milestones and their status
+- [Journal](docs/JOURNAL.md): problems we hit and how we resolved them
