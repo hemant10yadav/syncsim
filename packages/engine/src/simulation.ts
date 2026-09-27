@@ -86,6 +86,7 @@ export class Simulation {
   #now = 0;
   #nextMessageId = 1;
   readonly #replicas = new Map<NodeId, Replica>();
+  readonly #clockSkews = new Map<NodeId, number>();
   readonly #offline = new Set<NodeId>();
   /** Partition group per device. Empty map means everyone can reach everyone. */
   #groups = new Map<NodeId, number>();
@@ -98,8 +99,24 @@ export class Simulation {
     const replicaOptions = { schema: options.schema, registers: options.registers };
     for (const { id, clockSkewMs = 0 } of options.devices) {
       if (this.#replicas.has(id)) throw new Error(`Duplicate device id: ${id}`);
-      this.#replicas.set(id, new Replica(id, () => this.#now + clockSkewMs, replicaOptions));
+      this.#clockSkews.set(id, clockSkewMs);
+      const deviceClock = () => this.#now + (this.#clockSkews.get(id) ?? 0);
+      this.#replicas.set(id, new Replica(id, deviceClock, replicaOptions));
     }
+  }
+
+  clockSkew(node: NodeId): number {
+    this.replica(node);
+    return this.#clockSkews.get(node) ?? 0;
+  }
+
+  /**
+   * Set how far a device's clock is from true time. Its logical clock still never
+   * goes backwards; only wall-clock last-write-wins sees the raw reading.
+   */
+  setClockSkew(node: NodeId, skewMs: number): void {
+    this.replica(node);
+    this.#clockSkews.set(node, skewMs);
   }
 
   get now(): number {
