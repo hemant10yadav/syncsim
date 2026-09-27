@@ -253,12 +253,14 @@ export class Simulation {
       this.events.push({ kind: 'drop', at: this.#now, message, reason: blocked });
       return;
     }
-    this.events.push({ kind: 'send', at: this.#now, message });
     if (this.#rng.chance(this.#conditions.dropRate)) {
+      this.events.push({ kind: 'send', at: this.#now, message });
       this.events.push({ kind: 'drop', at: this.#now, message, reason: 'lost' });
       return;
     }
-    this.#enqueue({ ...message, deliverAt: this.#now + this.#latency() });
+    const sent: Message = { ...message, deliverAt: this.#now + this.#latency() };
+    this.events.push({ kind: 'send', at: this.#now, message: sent });
+    this.#enqueue(sent);
     if (this.#rng.chance(this.#conditions.duplicateRate)) {
       const copy: Message = {
         ...message,

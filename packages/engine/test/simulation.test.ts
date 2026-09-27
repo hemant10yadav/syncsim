@@ -22,6 +22,20 @@ describe('Simulation', () => {
     expect(s.inFlight()).toEqual([]);
   });
 
+  it('records on each send event the time the message will arrive', () => {
+    const s = sim({ network: { minLatencyMs: 20, maxLatencyMs: 400, duplicateRate: 0.5 } });
+    s.edit('a', 'case-1', 'name', 'Asha');
+    s.gossip();
+    s.advance(2_000);
+    const sends = new Map(ofKind(s.events, 'send').map((e) => [e.message.id, e.message]));
+    const delivered = ofKind(s.events, 'deliver');
+    expect(delivered.length).toBeGreaterThan(0);
+    for (const { message, at } of delivered) {
+      expect(sends.get(message.id)).toEqual(message);
+      expect(message.deliverAt).toBe(at);
+    }
+  });
+
   it('sends nothing to an offline device, then catches it up once it is back', () => {
     const s = sim();
     s.setOnline('b', false);
