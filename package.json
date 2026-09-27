@@ -1,0 +1,12 @@
+{
+  "name": "syncsim",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev -w playground",
+    "build": "npm run build -w playground",
+    "test": "npm test -w @syncsim/engine",
+    "typecheck": "npm run typecheck -w @syncsim/engine"
+  }
+}
