@@ -8,6 +8,16 @@ export type { Timestamp } from './hlc';
 export { Replica } from './replica';
 export { createRng } from './rng';
 export type { Rng } from './rng';
+export { PERFECT_NETWORK, Simulation } from './simulation';
+export type {
+  DeviceSpec,
+  DropReason,
+  Message,
+  NetworkConditions,
+  Payload,
+  SimEvent,
+  SimulationOptions,
+} from './simulation';
 export { pull, syncPair } from './sync';
 export type {
   FieldName,

@@ -1,0 +1,218 @@
+import { Replica } from './replica';
+import { createRng, type Rng } from './rng';
+import type { FieldName, FieldValue, NodeId, Operation, RecordId, VersionVector } from './types';
+
+export interface NetworkConditions {
+  readonly minLatencyMs: number;
+  readonly maxLatencyMs: number;
+  /** Probability that a message is lost in transit. */
+  readonly dropRate: number;
+  /** Probability that a message is delivered a second time. */
+  readonly duplicateRate: number;
+}
+
+export const PERFECT_NETWORK: NetworkConditions = {
+  minLatencyMs: 50,
+  maxLatencyMs: 50,
+  dropRate: 0,
+  duplicateRate: 0,
+};
+
+export type Payload =
+  | { readonly kind: 'sync-request'; readonly known: VersionVector }
+  | { readonly kind: 'sync-response'; readonly ops: readonly Operation[] };
+
+export interface Message {
+  readonly id: number;
+  readonly from: NodeId;
+  readonly to: NodeId;
+  readonly sentAt: number;
+  readonly deliverAt: number;
+  readonly payload: Payload;
+  /** True for the extra copy created by a duplicate delivery. */
+  readonly duplicate: boolean;
+}
+
+export type DropReason = 'lost';
+
+export type SimEvent =
+  | { readonly kind: 'edit'; readonly at: number; readonly op: Operation }
+  | { readonly kind: 'send'; readonly at: number; readonly message: Message }
+  | { readonly kind: 'drop'; readonly at: number; readonly message: Message; readonly reason: DropReason }
+  | {
+      readonly kind: 'deliver';
+      readonly at: number;
+      readonly message: Message;
+      /** Ops the recipient had not seen before. Always empty for requests. */
+      readonly applied: readonly Operation[];
+    };
+
+export interface DeviceSpec {
+  readonly id: NodeId;
+  /** How far this device's clock is from true time, in ms. */
+  readonly clockSkewMs?: number;
+}
+
+export interface SimulationOptions {
+  readonly seed: number;
+  readonly devices: readonly DeviceSpec[];
+  readonly network?: Partial<NetworkConditions>;
+}
+
+/**
+ * A deterministic, virtual-time world of devices syncing over an unreliable
+ * network. Nothing happens until `advance` moves time forward, and every random
+ * choice comes from the seed, so the same seed and the same calls always
+ * produce the same event log.
+ *
+ * Sync is pull-based: a device sends its version vector, and the peer replies
+ * with every op the vector does not cover. Lost requests or responses are
+ * harmless; the next round asks again.
+ */
+export class Simulation {
+  readonly events: SimEvent[] = [];
+  readonly #rng: Rng;
+  #conditions: NetworkConditions;
+  #now = 0;
+  #nextMessageId = 1;
+  readonly #replicas = new Map<NodeId, Replica>();
+  /** Messages in flight, ordered by delivery time, then by id. */
+  #queue: Message[] = [];
+
+  constructor(options: SimulationOptions) {
+    this.#rng = createRng(options.seed);
+    this.#conditions = validated({ ...PERFECT_NETWORK, ...options.network });
+    for (const { id, clockSkewMs = 0 } of options.devices) {
+      if (this.#replicas.has(id)) throw new Error(`Duplicate device id: ${id}`);
+      this.#replicas.set(id, new Replica(id, () => this.#now + clockSkewMs));
+    }
+  }
+
+  get now(): number {
+    return this.#now;
+  }
+
+  get conditions(): NetworkConditions {
+    return this.#conditions;
+  }
+
+  nodes(): NodeId[] {
+    return [...this.#replicas.keys()];
+  }
+
+  replica(node: NodeId): Replica {
+    const replica = this.#replicas.get(node);
+    if (!replica) throw new Error(`Unknown device: ${node}`);
+    return replica;
+  }
+
+  inFlight(): readonly Message[] {
+    return this.#queue;
+  }
+
+  edit(node: NodeId, record: RecordId, field: FieldName, value: FieldValue): Operation {
+    const op = this.replica(node).set(record, field, value);
+    this.events.push({ kind: 'edit', at: this.#now, op });
+    return op;
+  }
+
+  setConditions(patch: Partial<NetworkConditions>): void {
+    this.#conditions = validated({ ...this.#conditions, ...patch });
+  }
+
+  /** `requester` asks `peer` for the ops it is missing. */
+  requestSync(requester: NodeId, peer: NodeId): void {
+    this.#send(requester, peer, {
+      kind: 'sync-request',
+      known: this.replica(requester).versionVector(),
+    });
+  }
+
+  /** Every device asks every other device for what it is missing. */
+  gossip(): void {
+    for (const requester of this.#replicas.keys()) {
+      for (const peer of this.#replicas.keys()) {
+        if (peer !== requester) this.requestSync(requester, peer);
+      }
+    }
+  }
+
+  /** Move virtual time forward, delivering every message due on the way. */
+  advance(ms: number): void {
+    if (ms < 0) throw new RangeError('Cannot move time backwards');
+    const until = this.#now + ms;
+    let next = this.#queue[0];
+    while (next && next.deliverAt <= until) {
+      this.#queue.shift();
+      this.#now = next.deliverAt;
+      this.#deliver(next);
+      next = this.#queue[0];
+    }
+    this.#now = until;
+  }
+
+  #send(from: NodeId, to: NodeId, payload: Payload): void {
+    const message: Message = {
+      id: this.#nextMessageId++,
+      from,
+      to,
+      sentAt: this.#now,
+      deliverAt: this.#now,
+      payload,
+      duplicate: false,
+    };
+    this.events.push({ kind: 'send', at: this.#now, message });
+    if (this.#rng.chance(this.#conditions.dropRate)) {
+      this.events.push({ kind: 'drop', at: this.#now, message, reason: 'lost' });
+      return;
+    }
+    this.#enqueue({ ...message, deliverAt: this.#now + this.#latency() });
+    if (this.#rng.chance(this.#conditions.duplicateRate)) {
+      const copy: Message = {
+        ...message,
+        id: this.#nextMessageId++,
+        deliverAt: this.#now + this.#latency(),
+        duplicate: true,
+      };
+      this.events.push({ kind: 'send', at: this.#now, message: copy });
+      this.#enqueue(copy);
+    }
+  }
+
+  #deliver(message: Message): void {
+    const recipient = this.replica(message.to);
+    if (message.payload.kind === 'sync-request') {
+      this.events.push({ kind: 'deliver', at: this.#now, message, applied: [] });
+      this.#send(message.to, message.from, {
+        kind: 'sync-response',
+        ops: recipient.missingFor(message.payload.known),
+      });
+    } else {
+      const applied = recipient.receive(message.payload.ops);
+      this.events.push({ kind: 'deliver', at: this.#now, message, applied });
+    }
+  }
+
+  #latency(): number {
+    return this.#rng.int(this.#conditions.minLatencyMs, this.#conditions.maxLatencyMs);
+  }
+
+  #enqueue(message: Message): void {
+    const index = this.#queue.findIndex(
+      (m) => m.deliverAt > message.deliverAt || (m.deliverAt === message.deliverAt && m.id > message.id),
+    );
+    if (index === -1) this.#queue.push(message);
+    else this.#queue.splice(index, 0, message);
+  }
+}
+
+function validated(conditions: NetworkConditions): NetworkConditions {
+  const { minLatencyMs, maxLatencyMs, dropRate, duplicateRate } = conditions;
+  if (!(minLatencyMs >= 0 && maxLatencyMs >= minLatencyMs)) {
+    throw new RangeError('Latency must satisfy 0 <= min <= max');
+  }
+  if (!(dropRate >= 0 && dropRate <= 1 && duplicateRate >= 0 && duplicateRate <= 1)) {
+    throw new RangeError('Drop and duplicate rates must be between 0 and 1');
+  }
+  return conditions;
+}
