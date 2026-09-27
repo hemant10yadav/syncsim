@@ -65,7 +65,7 @@ export const SCENARIOS: readonly Scenario[] = [
         },
       },
       {
-        caption: 'Signal returns and the phones sync. B’s edit was later, so it wins. A’s “visited” is gone, and nobody was told.',
+        caption: 'Signal returns and the phones sync. B’s edit was later, so it wins. A’s “visited” is gone, and nobody was told. Tap “why?” next to Status to see it.',
         run: ({ sim }) => {
           sim.setOnline('A', true)
           sim.setOnline('B', true)

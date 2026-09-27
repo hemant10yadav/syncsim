@@ -1,6 +1,7 @@
 import type { Conflict, FieldName, FieldValue, NodeId, Replica } from '@syncsim/engine'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { CASE, SKEW_OPTIONS, STATUS_OPTIONS, TAG_OPTIONS } from '../world'
+import { WhyPanel } from './WhyPanel'
 
 /** What a phone panel shows. The same panel renders a simulated device or a real browser tab. */
 export interface PhoneView {
@@ -26,6 +27,18 @@ export interface PhoneActions {
 
 export function Phone({ view, actions }: { view: PhoneView; actions: PhoneActions }) {
   const { title, replica, online, clockSkew, detail, labelFor } = view
+  const [why, setWhy] = useState<FieldName | null>(null)
+  const label = (field: FieldName, text: string, badge?: ReactNode) => (
+    <FieldLabel
+      text={text}
+      badge={badge}
+      open={why === field}
+      lost={replica.explain(CASE, field).filter((e) => e.verdict.kind === 'lost').length}
+      phone={title}
+      onToggle={() => setWhy(why === field ? null : field)}
+    />
+  )
+  const whyFor = (field: FieldName) => why === field && <WhyPanel replica={replica} field={field} labelFor={labelFor} />
   const conflicts = replica.conflicts().filter((c) => c.record === CASE)
   const conflictOn = (field: FieldName) => conflicts.find((c) => c.field === field)
 
@@ -65,17 +78,18 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
       )}
 
       <div className="field">
-        <span className="field__label">Patient</span>
+        {label('name', 'Patient')}
         <TextField
           value={name}
           label={`Patient name on ${title}`}
           onCommit={(v) => actions.set('name', v)}
         />
         <ConflictPicker conflict={conflictOn('name')} labelFor={labelFor} onPick={(v) => actions.set('name', v)} />
+        {whyFor('name')}
       </div>
 
       <div className="field">
-        <span className="field__label">Status</span>
+        {label('status', 'Status')}
         <select
           aria-label={`Status on ${title}`}
           value={status}
@@ -91,24 +105,22 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
           <span className="field__hint">set by {labelFor(statusWriter)}</span>
         )}
         <ConflictPicker conflict={conflictOn('status')} labelFor={labelFor} onPick={(v) => actions.set('status', v)} />
+        {whyFor('status')}
       </div>
 
       <div className="field">
-        <span className="field__label">
-          Visits <KindBadge crdt={replica.kindOf('visits') === 'counter'} crdtName="counter" />
-        </span>
+        {label('visits', 'Visits', <KindBadge crdt={replica.kindOf('visits') === 'counter'} crdtName="counter" />)}
         <div className="field__row">
           <span className="visits">{typeof visits === 'number' ? visits : 0}</span>
           <button type="button" className="btn btn--small" onClick={() => actions.increment('visits')}>
             +1 visit
           </button>
         </div>
+        {whyFor('visits')}
       </div>
 
       <div className="field">
-        <span className="field__label">
-          Tags <KindBadge crdt={replica.kindOf('tags') === 'set'} crdtName="set" />
-        </span>
+        {label('tags', 'Tags', <KindBadge crdt={replica.kindOf('tags') === 'set'} crdtName="set" />)}
         <ul className="tags">
           {tags.map((tag) => (
             <li key={tag} className="tag">
@@ -137,6 +149,7 @@ export function Phone({ view, actions }: { view: PhoneView; actions: PhoneAction
             </button>
           ))}
         </div>
+        {whyFor('tags')}
       </div>
     </article>
   )
@@ -182,6 +195,34 @@ function ConflictPicker({ conflict, labelFor, onPick }: ConflictPickerProps) {
           “{asString(op.change.value)}” <span className="chip__from">{labelFor(op.node)}</span>
         </button>
       ))}
+    </div>
+  )
+}
+
+interface FieldLabelProps {
+  text: string
+  badge?: ReactNode
+  open: boolean
+  /** Edits to this field that last-write-wins discarded without a conflict. */
+  lost: number
+  phone: string
+  onToggle: () => void
+}
+
+function FieldLabel({ text, badge, open, lost, phone, onToggle }: FieldLabelProps) {
+  return (
+    <div className="field__label">
+      <span>{text}</span>
+      {badge}
+      <button
+        type="button"
+        className={`why-toggle${lost > 0 ? ' why-toggle--lost' : ''}`}
+        aria-expanded={open}
+        aria-label={`Explain the ${text.toLowerCase()} value on ${phone}.${lost > 0 ? ` ${lost} edit${lost === 1 ? '' : 's'} silently lost.` : ''}`}
+        onClick={onToggle}
+      >
+        {lost > 0 ? `why? · ${lost} lost` : 'why?'}
+      </button>
     </div>
   )
 }
