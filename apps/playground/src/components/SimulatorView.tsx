@@ -3,11 +3,12 @@ import { useEffect } from 'react'
 import { useSimulation } from '../useSimulation'
 import { CASE, deviceLabel, DEVICES, seedFromUrl, writeSeedToUrl } from '../world'
 import { Controls } from './Controls'
+import { NetworkView } from './NetworkView'
 import { Phone, type PhoneActions, type PhoneView } from './Phone'
 import { ScenarioPanel } from './ScenarioPanel'
 import { Timeline } from './Timeline'
 
-/** Three simulated phones on a simulated network, with controls, scenarios and a message timeline. */
+/** Three simulated phones on a simulated network, with scenarios, a live network view, controls and a timeline. */
 export function SimulatorView() {
   const controls = useSimulation({ seed: seedFromUrl(), mode: 'crdt' })
   const { sim, setup, act } = controls
@@ -37,6 +38,7 @@ export function SimulatorView() {
 
       <main className="layout">
         <ScenarioPanel controls={controls} />
+        <NetworkView sim={sim} onToggle={(id) => act((s) => s.setOnline(id, !s.isOnline(id)))} />
         <div className="phones">
           {DEVICES.map((d) => {
             const { view, actions } = simulatedPhone(sim, d.id, act)
