@@ -239,3 +239,62 @@ happened, why it mattered, and what changed.
   other session's browser. The script runs all three "Things to try" recipes
   and conflict resolution, checks the outcomes, captures console errors, and
   screenshots desktop, light mode and a 390 px phone width.
+
+## Milestone 5: scenarios, write-up and live tabs
+
+### Scenarios have to play out the same way every time
+
+- **Faced:** A guided scenario makes claims in its captions ("B's edit wins",
+  "the case says 2, not 3"). With auto-sync on a timer and a lossy network,
+  whether a claim held would depend on timing.
+- **Resolved:** Each scenario has a fixed seed and a lossless network, and
+  auto-sync is off while it runs, so phones sync only when a step says so.
+  `scenarios.test.ts` plays every scenario without the UI and asserts each
+  caption after each step, so a caption cannot silently become false.
+
+### The phone panel was tied to the simulator
+
+- **Faced:** The live-tab demo needed the same phone panel, but `Phone` read
+  everything from a `Simulation` (online state, clock skew, edits).
+- **Resolved:** `Phone` now takes a view (a replica plus online and clock
+  state) and a set of actions. The simulator and the live tab each supply
+  their own.
+
+### Setting state inside an effect
+
+- **Faced:** The first live hook created the session inside an effect and then
+  stored it in state, which oxlint flags (`react/set-state-in-effect`). It also
+  would not have survived React StrictMode's mount, unmount, remount in
+  development: the first cleanup would close the channel for good.
+- **Resolved:** `LiveSession` opens its channel lazily with `start()` and can
+  be stopped and started again. The hook creates the session once in
+  `useState` and the effect only starts and stops it. The strategy is set from
+  the click handler instead of an effect.
+
+### A test that could not fail
+
+- **Faced:** The first test for "only the tab a reply is addressed to applies
+  it" passed even with the address check removed, because the other tab
+  already held the op.
+- **Resolved:** The test now sends a reply addressed to one tab by hand, with
+  an op that exists nowhere else on the bus. Removing the address check makes
+  it fail; restoring it makes it pass.
+
+### Live tabs hid conflicts
+
+- **Faced:** The browser test took one tab offline, edited the status in both
+  tabs and reconnected, and found no conflict. The live session defaulted to
+  "logical clock wins", so the demo's most interesting case was invisible.
+- **Resolved:** Live tabs start on "Keep conflicts". Because strategies only
+  affect how a replica reads its history, a tab that switches strategy shows a
+  different result while the other tab still shows the conflict, on the same
+  edits.
+
+### Known limitation: two tabs opened at the same moment
+
+- **Faced:** A new tab waits 800 ms for peers and creates the patient case if
+  nobody answered. Two tabs opened at the same instant can both create it.
+- **Resolved (accepted):** The copies merge like any concurrent edits: the name
+  and status resolve by the strategy, and the visit counter shows 2. It is a
+  demo seeding shortcut, not a sync bug, so it is documented rather than
+  engineered away.
