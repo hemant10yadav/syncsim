@@ -33,7 +33,7 @@ export interface Message {
   readonly duplicate: boolean;
 }
 
-export type DropReason = 'lost';
+export type DropReason = 'lost' | 'offline' | 'partitioned';
 
 export type SimEvent =
   | { readonly kind: 'edit'; readonly at: number; readonly op: Operation }
@@ -59,6 +59,11 @@ export interface SimulationOptions {
   readonly network?: Partial<NetworkConditions>;
 }
 
+export interface SettleResult {
+  readonly converged: boolean;
+  readonly rounds: number;
+}
+
 /**
  * A deterministic, virtual-time world of devices syncing over an unreliable
  * network. Nothing happens until `advance` moves time forward, and every random
@@ -76,6 +81,9 @@ export class Simulation {
   #now = 0;
   #nextMessageId = 1;
   readonly #replicas = new Map<NodeId, Replica>();
+  readonly #offline = new Set<NodeId>();
+  /** Partition group per device. Empty map means everyone can reach everyone. */
+  #groups = new Map<NodeId, number>();
   /** Messages in flight, ordered by delivery time, then by id. */
   #queue: Message[] = [];
 
@@ -120,6 +128,37 @@ export class Simulation {
     this.#conditions = validated({ ...this.#conditions, ...patch });
   }
 
+  setOnline(node: NodeId, online: boolean): void {
+    this.replica(node);
+    if (online) this.#offline.delete(node);
+    else this.#offline.add(node);
+  }
+
+  isOnline(node: NodeId): boolean {
+    return !this.#offline.has(node);
+  }
+
+  /** Split devices into groups that cannot reach each other. Unlisted devices are cut off from everyone. */
+  partition(groups: readonly (readonly NodeId[])[]): void {
+    const assignment = new Map<NodeId, number>();
+    groups.forEach((group, index) => {
+      for (const node of group) {
+        this.replica(node);
+        if (assignment.has(node)) throw new Error(`Device ${node} is in more than one group`);
+        assignment.set(node, index);
+      }
+    });
+    let isolated = groups.length;
+    for (const node of this.#replicas.keys()) {
+      if (!assignment.has(node)) assignment.set(node, isolated++);
+    }
+    this.#groups = assignment;
+  }
+
+  heal(): void {
+    this.#groups = new Map();
+  }
+
   /** `requester` asks `peer` for the ops it is missing. */
   requestSync(requester: NodeId, peer: NodeId): void {
     this.#send(requester, peer, {
@@ -128,9 +167,10 @@ export class Simulation {
     });
   }
 
-  /** Every device asks every other device for what it is missing. */
+  /** Every online device asks every other device for what it is missing. */
   gossip(): void {
     for (const requester of this.#replicas.keys()) {
+      if (!this.isOnline(requester)) continue;
       for (const peer of this.#replicas.keys()) {
         if (peer !== requester) this.requestSync(requester, peer);
       }
@@ -151,6 +191,32 @@ export class Simulation {
     this.#now = until;
   }
 
+  /** True when every device holds exactly the same set of ops. */
+  converged(): boolean {
+    const [first, ...rest] = [...this.#replicas.values()].map(fingerprint);
+    return rest.every((f) => f === first);
+  }
+
+  /**
+   * Gossip until every device agrees and nothing is in flight, or give up after
+   * `maxRounds`. Each round waits long enough for a request and its response.
+   */
+  settle(maxRounds = 100): SettleResult {
+    for (let rounds = 0; rounds <= maxRounds; rounds++) {
+      if (this.#queue.length === 0 && this.converged()) return { converged: true, rounds };
+      if (rounds === maxRounds) break;
+      this.gossip();
+      this.advance(2 * this.#conditions.maxLatencyMs + 1);
+    }
+    return { converged: false, rounds: maxRounds };
+  }
+
+  #canReach(from: NodeId, to: NodeId): DropReason | undefined {
+    if (!this.isOnline(from) || !this.isOnline(to)) return 'offline';
+    if (this.#groups.size > 0 && this.#groups.get(from) !== this.#groups.get(to)) return 'partitioned';
+    return undefined;
+  }
+
   #send(from: NodeId, to: NodeId, payload: Payload): void {
     const message: Message = {
       id: this.#nextMessageId++,
@@ -161,6 +227,11 @@ export class Simulation {
       payload,
       duplicate: false,
     };
+    const blocked = this.#canReach(from, to);
+    if (blocked) {
+      this.events.push({ kind: 'drop', at: this.#now, message, reason: blocked });
+      return;
+    }
     this.events.push({ kind: 'send', at: this.#now, message });
     if (this.#rng.chance(this.#conditions.dropRate)) {
       this.events.push({ kind: 'drop', at: this.#now, message, reason: 'lost' });
@@ -180,6 +251,12 @@ export class Simulation {
   }
 
   #deliver(message: Message): void {
+    // The link may have gone down while the message was in the air.
+    const blocked = this.#canReach(message.from, message.to);
+    if (blocked) {
+      this.events.push({ kind: 'drop', at: this.#now, message, reason: blocked });
+      return;
+    }
     const recipient = this.replica(message.to);
     if (message.payload.kind === 'sync-request') {
       this.events.push({ kind: 'deliver', at: this.#now, message, applied: [] });
@@ -215,4 +292,16 @@ function validated(conditions: NetworkConditions): NetworkConditions {
     throw new RangeError('Drop and duplicate rates must be between 0 and 1');
   }
   return conditions;
+}
+
+/**
+ * The ids of every op a replica holds. State is a pure function of the op set,
+ * so equal fingerprints mean equal state.
+ */
+function fingerprint(replica: Replica): string {
+  return replica
+    .missingFor({})
+    .map((op) => op.id)
+    .sort()
+    .join(',');
 }

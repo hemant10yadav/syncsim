@@ -22,6 +22,53 @@ describe('Simulation', () => {
     expect(s.inFlight()).toEqual([]);
   });
 
+  it('sends nothing to an offline device, then catches it up once it is back', () => {
+    const s = sim();
+    s.setOnline('b', false);
+    s.edit('a', 'case-1', 'visits', 1);
+    s.gossip();
+    s.advance(500);
+    expect(s.replica('b').read('case-1')).toBeUndefined();
+    expect(ofKind(s.events, 'drop').every((e) => e.reason === 'offline')).toBe(true);
+
+    s.setOnline('b', true);
+    expect(s.settle().converged).toBe(true);
+    expect(s.replica('b').read('case-1')).toEqual({ visits: 1 });
+  });
+
+  it('loses a message that is in the air when its recipient goes offline', () => {
+    const s = sim();
+    s.requestSync('b', 'a');
+    s.advance(50);
+    s.setOnline('a', false);
+    s.advance(100);
+    expect(ofKind(s.events, 'deliver')).toEqual([]);
+    expect(ofKind(s.events, 'drop').map((e) => e.reason)).toEqual(['offline']);
+  });
+
+  it('keeps each side of a partition consistent internally, and merges them after healing', () => {
+    const s = sim();
+    s.partition([['a', 'b'], ['c']]);
+    s.edit('a', 'case-1', 'status', 'open');
+    s.advance(10);
+    s.edit('c', 'case-1', 'status', 'closed');
+
+    expect(s.settle(5).converged).toBe(false);
+    expect(s.replica('b').read('case-1')).toEqual({ status: 'open' });
+    expect(s.replica('c').read('case-1')).toEqual({ status: 'closed' });
+
+    s.heal();
+    expect(s.settle().converged).toBe(true);
+    for (const node of s.nodes()) expect(s.replica(node).read('case-1')).toEqual({ status: 'closed' });
+  });
+
+  it('cuts off devices left out of every partition group', () => {
+    const s = sim();
+    s.partition([['a', 'b']]);
+    s.requestSync('c', 'a');
+    expect(ofKind(s.events, 'drop').map((e) => e.reason)).toEqual(['partitioned']);
+  });
+
   it('delivers nothing when every message is lost', () => {
     const s = sim({ network: { dropRate: 1 } });
     s.edit('a', 'case-1', 'name', 'Asha');
@@ -71,7 +118,9 @@ describe('Simulation', () => {
     expect(() => sim().advance(-1)).toThrow(RangeError);
   });
 
-  it('rejects duplicate devices', () => {
+  it('rejects unknown and duplicate devices', () => {
     expect(() => new Simulation({ seed: 1, devices: [{ id: 'a' }, { id: 'a' }] })).toThrow(/Duplicate/);
+    expect(() => sim().setOnline('zz', false)).toThrow(/Unknown/);
+    expect(() => sim().partition([['a'], ['a', 'b']])).toThrow(/more than one group/);
   });
 });

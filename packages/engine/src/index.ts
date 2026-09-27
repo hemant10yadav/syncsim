@@ -15,6 +15,7 @@ export type {
   Message,
   NetworkConditions,
   Payload,
+  SettleResult,
   SimEvent,
   SimulationOptions,
 } from './simulation';
