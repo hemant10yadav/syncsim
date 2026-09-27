@@ -1,15 +1,21 @@
 import { useTheme } from '../useTheme'
 import { APPROACH_DOC_URL, JOURNAL_DOC_URL, PLAYGROUND_URL, PORTFOLIO_URL, REPO_URL } from './links'
 import { ClocksSection } from './sections/ClocksSection'
+import { CrdtSection } from './sections/CrdtSection'
 import { KeyIdeaSection } from './sections/KeyIdeaSection'
 import { ProblemSection } from './sections/ProblemSection'
+import { StillHardSection } from './sections/StillHardSection'
 import { StrategiesSection } from './sections/StrategiesSection'
+import { TestingSection } from './sections/TestingSection'
 
 const CONTENTS = [
   { id: 'problem', label: 'The problem' },
   { id: 'clocks', label: 'Why clocks lie' },
   { id: 'key-idea', label: 'The key idea' },
   { id: 'strategies', label: 'Three strategies' },
+  { id: 'crdts', label: 'Counters and sets' },
+  { id: 'testing', label: 'How it’s tested' },
+  { id: 'still-hard', label: 'What’s still hard' },
 ] as const
 
 export function ApproachPage() {
@@ -60,6 +66,9 @@ export function ApproachPage() {
         <ClocksSection />
         <KeyIdeaSection />
         <StrategiesSection />
+        <CrdtSection />
+        <TestingSection />
+        <StillHardSection />
       </main>
 
       <footer className="ap-footer">
