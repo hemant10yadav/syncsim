@@ -3,6 +3,8 @@
 
 export const ENGINE_VERSION = '0.0.0';
 
+export { counterValue, liveAdds, orSetElements } from './crdt';
+export type { IncrementOperation, SetElementOperation } from './crdt';
 export { compareTimestamps, HybridClock } from './hlc';
 export type { Timestamp } from './hlc';
 export { REGISTER_STRATEGIES, standingWrites, unreplaced } from './registers';
@@ -27,6 +29,7 @@ export type {
   Change,
   ChangeType,
   Conflict,
+  FieldKind,
   FieldName,
   FieldValue,
   NodeId,
@@ -34,6 +37,7 @@ export type {
   Operation,
   RecordId,
   RecordState,
+  Schema,
   Snapshot,
   VersionVector,
 } from './types';

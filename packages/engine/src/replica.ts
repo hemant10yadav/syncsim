@@ -1,8 +1,10 @@
+import { counterValue, liveAdds, orSetElements, type IncrementOperation, type SetElementOperation } from './crdt';
 import { compareTimestamps, HybridClock } from './hlc';
 import { standingWrites, unreplaced, type RegisterStrategy, type SetOperation } from './registers';
 import type {
   Change,
   Conflict,
+  FieldKind,
   FieldName,
   FieldValue,
   NodeId,
@@ -10,11 +12,14 @@ import type {
   Operation,
   RecordId,
   RecordState,
+  Schema,
   Snapshot,
   VersionVector,
 } from './types';
 
 export interface ReplicaOptions {
+  /** Field kinds; unlisted fields are registers. Must match on every replica. */
+  readonly schema?: Schema;
   /** How register fields resolve concurrent writes. Defaults to `lww-hlc`. */
   readonly registers?: RegisterStrategy;
 }
@@ -23,10 +28,10 @@ export interface ReplicaOptions {
  * One device's copy of the data.
  *
  * Every edit is kept as an Operation in a log, and the readable state is derived
- * from the log on demand by the chosen RegisterStrategy. Each strategy is a pure
- * function of the set of ops, and applying an op twice changes nothing, so
- * replicas that hold the same ops always show the same state, whatever order the
- * ops arrived in.
+ * from the log on demand: registers by the chosen RegisterStrategy, counters and
+ * sets by their CRDT rules. Each rule is a pure function of the set of ops, and
+ * applying an op twice changes nothing, so replicas that hold the same ops always
+ * show the same state, whatever order the ops arrived in.
  *
  * Because state is derived, switching the register strategy re-reads the same
  * history under a different rule; nothing in the log changes.
@@ -35,6 +40,7 @@ export class Replica {
   readonly node: NodeId;
   readonly #clock: HybridClock;
   readonly #physicalNow: () => number;
+  readonly #schema: Schema;
   #strategy: RegisterStrategy;
   #seq = 0;
   readonly #log = new Map<OpId, Operation>();
@@ -48,6 +54,7 @@ export class Replica {
     this.node = node;
     this.#physicalNow = physicalNow;
     this.#clock = new HybridClock(node, physicalNow);
+    this.#schema = options.schema ?? {};
     this.#strategy = options.registers ?? 'lww-hlc';
   }
 
@@ -59,10 +66,50 @@ export class Replica {
     this.#strategy = strategy;
   }
 
-  /** Overwrite a field. Replaces every value currently standing for it. */
+  kindOf(field: FieldName): FieldKind {
+    return this.#schema[field] ?? 'register';
+  }
+
+  /** Overwrite a register field. Replaces every value currently standing for it. */
   set(record: RecordId, field: FieldName, value: FieldValue): Operation {
-    const supersedes = unreplaced(this.#opsOf(record, field)).map((op) => op.id);
+    this.#expectKind(field, 'register', 'set');
+    const supersedes = unreplaced(this.#opsOf(record, field, isSet)).map((op) => op.id);
     return this.#local(record, field, { type: 'set', value, supersedes });
+  }
+
+  /**
+   * Add `by` to a number. On a counter field this is a CRDT increment. On a
+   * register field it does what a naive app does: read the value, write value + by,
+   * which loses increments made concurrently elsewhere.
+   */
+  increment(record: RecordId, field: FieldName, by = 1): Operation {
+    if (this.kindOf(field) === 'register') {
+      const current = this.value(record, field);
+      return this.set(record, field, (typeof current === 'number' ? current : 0) + by);
+    }
+    this.#expectKind(field, 'counter', 'increment');
+    return this.#local(record, field, { type: 'increment', by });
+  }
+
+  /** Add a string to a set field, or, on a register field, rewrite the whole list. */
+  addElement(record: RecordId, field: FieldName, element: string): Operation {
+    if (this.kindOf(field) === 'register') {
+      return this.set(record, field, [...new Set([...this.#list(record, field), element])].sort());
+    }
+    this.#expectKind(field, 'set', 'addElement');
+    return this.#local(record, field, { type: 'add', element });
+  }
+
+  /** Remove a string from a set field, or, on a register field, rewrite the whole list. */
+  removeElement(record: RecordId, field: FieldName, element: string): Operation {
+    if (this.kindOf(field) === 'register') {
+      return this.set(record, field, this.#list(record, field).filter((e) => e !== element));
+    }
+    this.#expectKind(field, 'set', 'removeElement');
+    const observed = liveAdds(this.#opsOf(record, field, isSetElement))
+      .filter((op) => op.change.element === element)
+      .map((op) => op.id);
+    return this.#local(record, field, { type: 'remove', element, observed });
   }
 
   /** Apply ops from peers. Duplicates and out-of-order delivery are fine. Returns the ops that were new. */
@@ -95,7 +142,18 @@ export class Replica {
 
   /** Current value of one field, or undefined if it has never been written. */
   value(record: RecordId, field: FieldName): FieldValue | undefined {
-    return this.winner(record, field)?.change.value;
+    switch (this.kindOf(field)) {
+      case 'register':
+        return this.winner(record, field)?.change.value;
+      case 'counter': {
+        const ops = this.#opsOf(record, field, isIncrement);
+        return ops.length > 0 ? counterValue(ops) : undefined;
+      }
+      case 'set': {
+        const ops = this.#opsOf(record, field, isSetElement);
+        return ops.length > 0 ? orSetElements(ops) : undefined;
+      }
+    }
   }
 
   read(record: RecordId): RecordState | undefined {
@@ -115,16 +173,17 @@ export class Replica {
     );
   }
 
-  /** The write currently displayed for a field, for explaining why a value is what it is. */
+  /** The write currently displayed for a register field, for explaining why a value is what it is. */
   winner(record: RecordId, field: FieldName): SetOperation | undefined {
     return this.#standing(record, field)[0];
   }
 
-  /** Fields with more than one standing write. Only the multi-value strategy produces these. */
+  /** Register fields with more than one standing write. Only the multi-value strategy produces these. */
   conflicts(): Conflict[] {
     const found: Conflict[] = [];
     for (const [record, fields] of this.#fieldOps) {
       for (const field of fields.keys()) {
+        if (this.kindOf(field) !== 'register') continue;
         const candidates = this.#standing(record, field);
         if (candidates.length > 1) found.push({ record, field, candidates });
       }
@@ -133,11 +192,21 @@ export class Replica {
   }
 
   #standing(record: RecordId, field: FieldName): SetOperation[] {
-    return standingWrites(this.#strategy, this.#opsOf(record, field));
+    return standingWrites(this.#strategy, this.#opsOf(record, field, isSet));
   }
 
-  #opsOf(record: RecordId, field: FieldName): SetOperation[] {
-    return this.#fieldOps.get(record)?.get(field) ?? [];
+  #list(record: RecordId, field: FieldName): readonly string[] {
+    const current = this.value(record, field);
+    return Array.isArray(current) ? current : [];
+  }
+
+  #expectKind(field: FieldName, kind: FieldKind, method: string): void {
+    const actual = this.kindOf(field);
+    if (actual !== kind) throw new TypeError(`Cannot ${method} "${field}": it is a ${actual} field`);
+  }
+
+  #opsOf<T extends Operation>(record: RecordId, field: FieldName, guard: (op: Operation) => op is T): T[] {
+    return (this.#fieldOps.get(record)?.get(field) ?? []).filter(guard);
   }
 
   #local(record: RecordId, field: FieldName, change: Change): Operation {
@@ -183,3 +252,10 @@ export class Replica {
     this.#contiguous.set(op.node, upTo);
   }
 }
+
+// Ops whose change does not match the field's kind (possible only if replicas
+// disagree on the schema) are ignored by every replica alike, so state still converges.
+const isSet = (op: Operation): op is SetOperation => op.change.type === 'set';
+const isIncrement = (op: Operation): op is IncrementOperation => op.change.type === 'increment';
+const isSetElement = (op: Operation): op is SetElementOperation =>
+  op.change.type === 'add' || op.change.type === 'remove';

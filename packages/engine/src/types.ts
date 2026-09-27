@@ -3,17 +3,37 @@ import type { Timestamp } from './hlc';
 export type NodeId = string;
 export type RecordId = string;
 export type FieldName = string;
-export type FieldValue = string | number | boolean | null;
+export type FieldValue = string | number | boolean | null | readonly string[];
 
 /** `${node}:${seq}`, unique across the whole system. */
 export type OpId = string;
 
-export type Change = {
-  readonly type: 'set';
-  readonly value: FieldValue;
-  /** Ids of the values the writer had on screen for this field, which this write replaces. */
-  readonly supersedes: readonly OpId[];
-};
+/**
+ * How a field merges.
+ * - `register`: holds one value; concurrent writes are resolved by a RegisterStrategy.
+ * - `counter`: a PN-counter; concurrent increments all count.
+ * - `set`: an observed-remove set of strings; a remove only cancels the adds it had seen.
+ */
+export type FieldKind = 'register' | 'counter' | 'set';
+
+/** Field kinds by name. Fields not listed are registers. Every replica must share one schema. */
+export type Schema = Readonly<Record<FieldName, FieldKind>>;
+
+export type Change =
+  | {
+      readonly type: 'set';
+      readonly value: FieldValue;
+      /** Ids of the values the writer had on screen for this field, which this write replaces. */
+      readonly supersedes: readonly OpId[];
+    }
+  | { readonly type: 'increment'; readonly by: number }
+  | { readonly type: 'add'; readonly element: string }
+  | {
+      readonly type: 'remove';
+      readonly element: string;
+      /** Ids of the adds of `element` the writer had seen. Only those are cancelled. */
+      readonly observed: readonly OpId[];
+    };
 
 export type ChangeType = Change['type'];
 

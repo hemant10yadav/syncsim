@@ -86,3 +86,96 @@ describe('register strategies on real histories', () => {
     expect(a.conflicts()).toEqual([]);
   });
 });
+
+describe('counters', () => {
+  function offlineVisits(options: ReplicaOptions) {
+    const w = world(options);
+    const a = w.device('a');
+    const b = w.device('b');
+    a.increment('case-1', 'visits');
+    syncPair(a, b);
+    // Both health workers record a visit while offline.
+    a.increment('case-1', 'visits');
+    b.increment('case-1', 'visits');
+    syncPair(a, b);
+    return { a, b };
+  }
+
+  it('a counter field keeps every concurrent increment', () => {
+    const { a, b } = offlineVisits({ schema: { visits: 'counter' } });
+    expect(a.value('case-1', 'visits')).toBe(3);
+    expect(b.value('case-1', 'visits')).toBe(3);
+  });
+
+  it('a register field loses one of two concurrent increments', () => {
+    const { a, b } = offlineVisits({});
+    expect(a.value('case-1', 'visits')).toBe(2);
+    expect(b.value('case-1', 'visits')).toBe(2);
+  });
+
+  it('supports decrements', () => {
+    const phone = world({ schema: { visits: 'counter' } }).device('a');
+    phone.increment('case-1', 'visits', 5);
+    phone.increment('case-1', 'visits', -2);
+    expect(phone.value('case-1', 'visits')).toBe(3);
+  });
+});
+
+describe('sets', () => {
+  function concurrentTagEdits(options: ReplicaOptions) {
+    const w = world(options);
+    const a = w.device('a');
+    const b = w.device('b');
+    a.addElement('case-1', 'tags', 'followup');
+    syncPair(a, b);
+    // Offline: a adds a new tag while b removes the existing one.
+    a.addElement('case-1', 'tags', 'urgent');
+    w.advance(10);
+    b.removeElement('case-1', 'tags', 'followup');
+    syncPair(a, b);
+    return { a, b };
+  }
+
+  it('a set field keeps both the add and the remove', () => {
+    const { a, b } = concurrentTagEdits({ schema: { tags: 'set' } });
+    expect(a.value('case-1', 'tags')).toEqual(['urgent']);
+    expect(b.value('case-1', 'tags')).toEqual(['urgent']);
+  });
+
+  it('a register list keeps only one of the two edits', () => {
+    const { a } = concurrentTagEdits({});
+    // b's rewrite came last, so a's "urgent" tag is gone.
+    expect(a.value('case-1', 'tags')).toEqual([]);
+  });
+
+  it('keeps a tag re-added on one device while another device removes it', () => {
+    const w = world({ schema: { tags: 'set' } });
+    const a = w.device('a');
+    const b = w.device('b');
+    a.addElement('case-1', 'tags', 'urgent');
+    syncPair(a, b);
+    b.removeElement('case-1', 'tags', 'urgent');
+    a.addElement('case-1', 'tags', 'urgent');
+    syncPair(a, b);
+    expect(b.value('case-1', 'tags')).toEqual(['urgent']);
+  });
+});
+
+describe('schema', () => {
+  it('rejects edits that do not match the field kind', () => {
+    const phone = world({ schema: { visits: 'counter', tags: 'set' } }).device('a');
+    expect(() => phone.set('case-1', 'visits', 3)).toThrow(TypeError);
+    expect(() => phone.addElement('case-1', 'visits', 'x')).toThrow(TypeError);
+    expect(() => phone.increment('case-1', 'tags')).toThrow(TypeError);
+  });
+
+  it('ignores remote ops that do not match the field kind, the same way on every device', () => {
+    const w = world();
+    const misconfigured = w.device('old');
+    const a = new Replica('a', () => 0, { schema: { visits: 'counter' } });
+    misconfigured.set('case-1', 'visits', 99);
+    pull(a, misconfigured);
+    a.increment('case-1', 'visits');
+    expect(a.value('case-1', 'visits')).toBe(1);
+  });
+});
