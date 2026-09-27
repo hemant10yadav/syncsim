@@ -2,3 +2,19 @@
 // so the engine can be tested in isolation and published on its own later.
 
 export const ENGINE_VERSION = '0.0.0';
+
+export { compareTimestamps, HybridClock } from './hlc';
+export type { Timestamp } from './hlc';
+export { Replica } from './replica';
+export { pull, syncPair } from './sync';
+export type {
+  FieldName,
+  FieldValue,
+  NodeId,
+  OpId,
+  Operation,
+  RecordId,
+  RecordState,
+  Snapshot,
+  VersionVector,
+} from './types';
