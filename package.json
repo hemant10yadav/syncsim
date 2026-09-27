@@ -2,11 +2,18 @@
   "name": "syncsim",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "npm run dev -w playground",
     "build": "npm run build -w playground",
+    "lint": "oxlint --deny-warnings",
     "test": "npm test -w @syncsim/engine",
     "typecheck": "npm run typecheck -w @syncsim/engine"
+  },
+  "devDependencies": {
+    "oxlint": "^1.85.0"
   }
 }
