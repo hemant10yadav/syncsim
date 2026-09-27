@@ -9,6 +9,11 @@ const BASE = process.env.DEMO_BASE ?? 'http://localhost:5173/syncsim/'
 // ?seed= skips the first-visit tour, so the walkthrough starts on the scenario list.
 const START = `${BASE}?seed=7`
 
+// 1600 × 830 comes out as exactly 16:9 (1760 × 990) once render.py adds its 5% frame on every side.
+const VIEW = { width: 1600, height: 830 }
+/** Page zoom for the recording: a little zoomed out, so each frame shows more of the page. */
+const ZOOM = 0.9
+
 const phone = (p, id) => p.getByRole('article', { name: `Phone ${id}` })
 const status = (p, id) => p.getByLabel(`Status on Phone ${id}`, { exact: true })
 const nextStep = (p) => p.getByRole('button', { name: 'Next step' })
@@ -138,9 +143,18 @@ await run(
     INTRO,
     OUTRO,
     STEPS,
-    VIEW: { width: 1280, height: 900 },
+    VIEW,
     firstUrl: START,
     useState: false,
+    // Runs before the first page loads; applies to every page the flow opens.
+    preAuth: (p) =>
+      p.addInitScript((zoom) => {
+        document.addEventListener('DOMContentLoaded', () => {
+          const style = document.createElement('style')
+          style.textContent = `#root { zoom: ${zoom}; }`
+          document.head.append(style)
+        })
+      }, ZOOM),
   },
   import.meta.url,
 )
