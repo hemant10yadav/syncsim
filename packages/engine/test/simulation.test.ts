@@ -22,6 +22,36 @@ describe('Simulation', () => {
     expect(s.inFlight()).toEqual([]);
   });
 
+  it('records on each send event the time the message will arrive', () => {
+    const s = sim({ network: { minLatencyMs: 20, maxLatencyMs: 400, duplicateRate: 0.5 } });
+    s.edit('a', 'case-1', 'name', 'Asha');
+    s.gossip();
+    s.advance(2_000);
+    const sends = new Map(ofKind(s.events, 'send').map((e) => [e.message.id, e.message]));
+    const delivered = ofKind(s.events, 'deliver');
+    expect(delivered.length).toBeGreaterThan(0);
+    for (const { message, at } of delivered) {
+      expect(sends.get(message.id)).toEqual(message);
+      expect(message.deliverAt).toBe(at);
+    }
+  });
+
+  it('lets a device clock be set wrong mid-run', () => {
+    const s = sim();
+    s.advance(1_000);
+    expect(s.edit('a', 'case-1', 'status', 'open').deviceTime).toBe(1_000);
+    s.setClockSkew('a', 3_600_000);
+    expect(s.clockSkew('a')).toBe(3_600_000);
+    const fast = s.edit('a', 'case-1', 'status', 'closed');
+    expect(fast.deviceTime).toBe(3_601_000);
+    s.setClockSkew('a', -3_600_000);
+    // The logical clock keeps moving forward even when the device clock jumps back.
+    const slow = s.edit('a', 'case-1', 'status', 'open');
+    expect(slow.deviceTime).toBe(-3_599_000);
+    expect(slow.ts.wall).toBe(fast.ts.wall);
+    expect(slow.ts.counter).toBeGreaterThan(fast.ts.counter);
+  });
+
   it('sends nothing to an offline device, then catches it up once it is back', () => {
     const s = sim();
     s.setOnline('b', false);

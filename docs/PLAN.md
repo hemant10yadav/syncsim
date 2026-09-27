@@ -41,9 +41,9 @@ the claims.
 |---|---|---|
 | 1 | Hybrid logical clock, op log, replica, per-field last-write-wins, version-vector sync, CI | Done (PR #1) |
 | 2 | Seeded network simulator: latency, loss, duplication, offline devices, partitions, settling | Done (PR #2) |
-| 3 | Switchable register strategies (wall-clock LWW, HLC LWW, multi-value conflicts); CRDTs: PN-counter, OR-set | In review |
-| 4 | Playground: three devices, network controls, message timeline, strategy switcher | Next |
-| 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | Planned |
+| 3 | Switchable register strategies (wall-clock LWW, HLC LWW, multi-value conflicts); CRDTs: PN-counter, OR-set | Done (PR #3) |
+| 4 | Playground: three devices, network controls, message timeline, strategy switcher | In review |
+| 5 | Preset scenarios, `APPROACH.md`, cross-tab sync via BroadcastChannel, portfolio card | Next |
 
 ### 1. Engine core (done)
 
@@ -69,7 +69,7 @@ the claims.
 - Full event log (`edit`, `send`, `drop`, `deliver`) for the playground to
   animate.
 
-### 3. Conflict-aware strategies (in review)
+### 3. Conflict-aware strategies (done)
 
 - A schema gives each field a kind: `register`, `counter` or `set`
   (`src/types.ts`). Unlisted fields are registers.
@@ -95,16 +95,26 @@ the claims.
   (`test/strategies.test.ts`), and the network property test now covers all
   strategies, counters and sets, and checks no increment is ever lost.
 
-### 4. Playground (next)
+### 4. Playground (in review)
 
-- Three phone panels editing one "patient case" record.
-- Online/offline toggle per device, sliders for latency, loss and clock skew,
-  partition controls, strategy dropdown.
-- Message timeline built from the simulation's event log, with conflicts
-  highlighted.
-- Seed shown and editable, so any run can be shared and replayed.
+- `apps/playground`, React + Vite, styled with the portfolio's colour tokens
+  and fonts, dark and light themes.
+- `useSimulation` drives one `Simulation` in virtual time: each animation
+  frame advances the clock by real time times the chosen speed, and a gossip
+  round runs every 2.5 virtual seconds while auto-sync is on.
+- Three phone panels editing one patient case: name, status, visits, tags.
+  Each phone can go offline and have its clock set 1 h slow or fast.
+- Conflicts under "Keep conflicts" appear on every phone, with a picker that
+  writes the resolution.
+- Controls: play/pause, speed, auto-sync, sync now, reset, new seed, merge
+  strategy, plain values vs CRDTs, delay, loss, duplication, partitions.
+- Timeline: a sequence diagram of the last 15 s (8 s on phones) built from the
+  event log, showing edits, requests, responses, duplicates and losses.
+- The seed lives in the URL (`?seed=42`), so a run can be shared.
+- Engine additions for the UI: send events carry the real delivery time, and
+  `Simulation.setClockSkew` changes a device clock mid-run.
 
-### 5. Polish (planned)
+### 5. Polish (next)
 
 - Preset scenarios: "Two health workers edit the same case", "The clock
   liar", "Duplicate delivery", each with step-by-step replay.

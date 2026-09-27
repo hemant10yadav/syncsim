@@ -167,3 +167,75 @@ happened, why it mattered, and what changed.
 - **Resolved:** Three planted bugs, each caught: a counter that ignores
   decrements (3 tests failed), a remove that cancels unseen adds (4 failed),
   and multi-value ignoring `supersedes` (4 failed).
+
+## Milestone 4: playground
+
+### The timeline could not tell when a message would arrive
+
+- **Faced:** Send events were recorded before the latency was chosen, so every
+  send event said the message would arrive the moment it left.
+- **Resolved:** The simulation records the send event after picking the
+  latency, so it carries the real delivery time. The random draws happen in
+  the same order as before, so every seed still replays the same run. A test
+  checks that each delivered message matches its send event.
+
+### Clock drift was fixed at start-up
+
+- **Faced:** The "clock liar" demo needs a phone's clock set wrong while the
+  demo is running, but skew could only be set when the simulation was created.
+- **Resolved:** `Simulation.setClockSkew`. The device's logical clock still
+  never goes backwards when its wall clock jumps back, which a test pins down.
+
+### "Cannot move time backwards" in the browser
+
+- **Faced:** The first browser run logged a `RangeError`. `requestAnimationFrame`
+  passes the frame's start time, which can be earlier than the
+  `performance.now()` taken when the loop started, giving a negative step.
+- **Resolved:** The frame step is clamped at zero.
+
+### Sync stalled for a minute after a reset
+
+- **Faced:** After switching between plain values and CRDTs (which resets the
+  demo), phones stopped syncing. One last frame of the old world ran after the
+  reset and advanced the shared "next gossip" time using the old world's clock,
+  about a minute ahead of the new one.
+- **Resolved:** The gossip schedule stores which simulation it belongs to and
+  restarts when the simulation changes.
+
+### Timeline misclassified dropped messages
+
+- **Faced:** The timeline walks the event log backwards, so a message's drop
+  event is seen before its send event. The first version checked for the send
+  event and so could never match.
+- **Resolved:** Drops are classified from the message itself: a message lost in
+  transit, or one that already had a delivery time, was in the air; anything
+  else was refused before it left (offline sender or partition).
+
+### "All phones agree" while a conflict was open
+
+- **Faced:** Under "Keep conflicts", the header said every phone agreed while
+  each phone showed a conflict. Both were true (the phones hold the same data),
+  but it read as a contradiction.
+- **Resolved:** The header says "All phones in sync" and shows a separate
+  "open conflict" count.
+
+### Layout issues found in screenshots
+
+- **Faced:** Messages from just before the window drew over the lane labels;
+  the timeline was cramped at phone width; strategy and partition buttons
+  wrapped unevenly; on phones every control came before the first phone.
+- **Resolved:** The plot is clipped to its area; narrow screens get one-letter
+  lanes and an 8 s window; the button groups use a grid; on narrow screens the
+  phones come first and the controls follow.
+
+### Testing in a real browser
+
+- **Faced:** The Chrome DevTools tool could not start because another session's
+  browser held its profile, and the first dev-server start passed the port flag
+  through npm workspaces wrongly, so Vite served a folder named `5199` and every
+  page returned 404.
+- **Resolved:** Started Vite from `apps/playground` directly, and drove the
+  installed Chrome with a small `playwright-core` script instead of killing the
+  other session's browser. The script runs all three "Things to try" recipes
+  and conflict resolution, checks the outcomes, captures console errors, and
+  screenshots desktop, light mode and a 390 px phone width.
