@@ -3,6 +3,7 @@ name: Deploy playground to GitHub Pages
 on:
   push:
     branches: [main]
+  # ./demo.sh --publish starts this after updating the demo-video branch.
   workflow_dispatch:
 
 permissions:
@@ -25,6 +26,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The walkthrough video lives on the demo-video branch (./demo.sh --publish), not on main.
+      - name: Add the walkthrough video
+        run: |
+          if git fetch --depth 1 origin demo-video; then
+            mkdir -p apps/playground/dist/demos
+            git archive FETCH_HEAD demos | tar -x --strip-components=1 -C apps/playground/dist/demos
+          else
+            echo "No demo-video branch yet; deploying without a video."
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/playground/dist
