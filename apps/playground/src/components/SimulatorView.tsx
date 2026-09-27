@@ -1,5 +1,6 @@
 import type { NodeId, Simulation } from '@syncsim/engine'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { SCENARIOS, type Scenario } from '../scenarios'
 import { useSimulation } from '../useSimulation'
 import { CASE, deviceLabel, DEVICES, seedFromUrl, writeSeedToUrl } from '../world'
 import { Controls } from './Controls'
@@ -11,8 +12,19 @@ import { Timeline } from './Timeline'
 
 /** Three simulated phones on a simulated network, with scenarios, a live network view, controls and a timeline. */
 export function SimulatorView() {
-  const controls = useSimulation({ seed: seedFromUrl(), mode: 'crdt' })
+  const [tour] = useState(firstVisitTour)
+  const controls = useSimulation({ seed: seedFromUrl(), mode: 'crdt' }, tour)
   const { sim, setup, act } = controls
+
+  // Remember the tour has been offered, so it plays only once.
+  useEffect(() => {
+    if (!tour) return
+    try {
+      localStorage.setItem(TOUR_KEY, '1')
+    } catch {
+      // Storage can be blocked; the tour may then play again next visit.
+    }
+  }, [tour])
 
   // Keep the seed in the URL so a run can be shared and replayed.
   useEffect(() => writeSeedToUrl(setup.seed), [setup.seed])
@@ -69,6 +81,22 @@ export function SimulatorView() {
       </main>
     </>
   )
+}
+
+const TOUR_KEY = 'syncsim_toured'
+
+/**
+ * On a first visit, play the first scenario by itself. Skipped for a shared link
+ * (`?seed=`), which should open on exactly the run that was shared.
+ */
+function firstVisitTour(): Scenario | null {
+  if (new URLSearchParams(window.location.search).has('seed')) return null
+  try {
+    if (localStorage.getItem(TOUR_KEY)) return null
+  } catch {
+    return null
+  }
+  return SCENARIOS[0] ?? null
 }
 
 function simulatedPhone(

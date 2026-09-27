@@ -1,9 +1,22 @@
+import { useEffect } from 'react'
 import { SCENARIOS } from '../scenarios'
 import type { SimulationControls } from '../useSimulation'
 
+/** Real ms a step stays on screen while a scenario plays itself: long enough to read the caption. */
+const AUTOPLAY_STEP_MS = 5_000
+
 /** Guided, step-by-step stories. Each one starts from its own seed, so it plays out the same way every time. */
 export function ScenarioPanel({ controls }: { controls: SimulationControls }) {
-  const { scenario: active, startScenario, nextStep, exitScenario } = controls
+  const { scenario: active, startScenario, nextStep, exitScenario, autoplay, setAutoplay } = controls
+  const step = active?.step ?? 0
+  const last = !active || step === active.scenario.steps.length - 1
+
+  useEffect(() => {
+    if (!autoplay || last) return
+    const timer = window.setTimeout(nextStep, AUTOPLAY_STEP_MS)
+    return () => window.clearTimeout(timer)
+    // nextStep changes with every step, which restarts the timer for the next one.
+  }, [autoplay, last, nextStep])
 
   if (!active) {
     return (
@@ -24,8 +37,7 @@ export function ScenarioPanel({ controls }: { controls: SimulationControls }) {
     )
   }
 
-  const { scenario, step } = active
-  const last = step === scenario.steps.length - 1
+  const { scenario } = active
 
   return (
     <section className="scenario-player" aria-label={`Scenario: ${scenario.title}`}>
@@ -47,6 +59,11 @@ export function ScenarioPanel({ controls }: { controls: SimulationControls }) {
         <button type="button" className="btn btn--primary" onClick={nextStep} disabled={last}>
           {last ? 'Done' : 'Next step'}
         </button>
+        {!last && (
+          <button type="button" className="btn" aria-pressed={autoplay} onClick={() => setAutoplay(!autoplay)}>
+            {autoplay ? 'Pause autoplay' : 'Autoplay'}
+          </button>
+        )}
         <button type="button" className="btn" onClick={() => startScenario(scenario)}>
           Restart
         </button>
@@ -54,7 +71,10 @@ export function ScenarioPanel({ controls }: { controls: SimulationControls }) {
           Exit scenario
         </button>
       </div>
-      <p className="group__note">Auto-sync is off: phones sync only when a step says so.</p>
+      <p className="group__note">
+        {autoplay && !last ? 'Playing by itself: the next step starts in a few seconds. ' : ''}
+        Auto-sync is off: phones sync only when a step says so.
+      </p>
     </section>
   )
 }
