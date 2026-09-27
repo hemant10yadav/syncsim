@@ -764,6 +764,46 @@ select option {
   line-height: 1.55;
 }
 
+/* ── live tabs ─────────────────────────────────────────────────────────── */
+
+.live {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .live {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    align-items: start;
+  }
+}
+
+.live__intro {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border-2);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+
+.live__intro p {
+  margin: 0;
+  color: var(--fg-2);
+}
+
+.live__title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.notice {
+  padding: 16px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: var(--danger-soft);
+}
+
 /* ── recipes ───────────────────────────────────────────────────────────── */
 
 .recipes {
