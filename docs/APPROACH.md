@@ -149,6 +149,22 @@ If an op's change does not match its field's kind (possible only if devices
 disagree on the schema), every replica ignores it the same way, so state still
 converges. Local edits of the wrong kind throw.
 
+### Explaining outcomes
+
+`Replica.explain(record, field)` lists every edit to a field, oldest first,
+with what became of it under the current strategy:
+
+- **shown** or, under multi-value, **competing**.
+- **replaced**: a later write listed it in `supersedes`, so its author saw it.
+- **silently lost**: not replaced and not standing. Only last-write-wins
+  produces this, and it is exactly the case users never hear about: a
+  concurrent edit that was dropped.
+- Counters: every increment is **counted**. Sets: adds are **present** or
+  **removed** by the removes that saw them.
+
+The playground's "why?" panels are built on this, so the explanation comes from
+the same code that computes the value rather than from a separate guess.
+
 ### Deterministic output
 
 Maps iterate in arrival order, which differs between devices. `read`,

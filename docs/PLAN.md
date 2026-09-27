@@ -134,7 +134,33 @@ Done, in review:
 - `Phone` takes a view and actions instead of a `Simulation`, so the same
   panel renders simulated phones and real tabs.
 
-Next:
+### UI upgrade (in review)
+
+The first playground looked like a set of forms: the interesting behaviour
+(messages moving, edits being lost) was hidden. All five parts ship in one PR.
+
+- Network view (`components/NetworkView.tsx`): the phones as nodes on a
+  triangle, links that break when a phone is offline or partitioned, messages
+  moving along the links (requests, edits, empty replies, duplicates), bursts
+  where messages are lost, pulses where edits are made or arrive, and each
+  phone's sync state. Click or press Enter on a phone to take it offline.
+- "Why this value?" on every field (`components/WhyPanel.tsx`, backed by
+  `Replica.explain`): every edit to the field and what became of it. A write
+  that last-write-wins discarded is marked "silently lost", in red, with the
+  reason.
+- The guided scenarios stay as they are; one caption now points at "why?".
+- Strategy comparison (`components/StrategyComparison.tsx`): every plain-value
+  field under all three strategies at once, with how many edits each one
+  silently loses, for the edits a chosen phone holds. Differing columns are
+  flagged; clicking a row switches the strategy.
+- Edit log on every phone (`components/EditLog.tsx`): its edits newest first,
+  where each came from, its version vector, and edits held past a gap.
+- Polish: phones drawn as devices with a status bar (the device's own clock,
+  signal or "no signal"), a flash on any value that changes, and a first-visit
+  tour that plays "Two health workers" by itself (skipped for shared `?seed=`
+  links, pausable, shown once).
+
+Then:
 
 - Make the repo public, enable Pages, check the live URL, README screenshot.
 - Add the syncsim project card to the portfolio.
