@@ -6,6 +6,7 @@ import { Controls } from './Controls'
 import { NetworkView } from './NetworkView'
 import { Phone, type PhoneActions, type PhoneView } from './Phone'
 import { ScenarioPanel } from './ScenarioPanel'
+import { StrategyComparison } from './StrategyComparison'
 import { Timeline } from './Timeline'
 
 /** Three simulated phones on a simulated network, with scenarios, a live network view, controls and a timeline. */
@@ -45,6 +46,7 @@ export function SimulatorView() {
             return <Phone key={d.id} view={view} actions={actions} />
           })}
         </div>
+        <StrategyComparison sim={sim} strategy={controls.strategy} onChoose={controls.setStrategy} />
         <Controls controls={controls} />
         <Timeline sim={sim} />
         <section className="recipes" aria-label="Things to try">
