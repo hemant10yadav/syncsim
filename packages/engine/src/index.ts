@@ -3,9 +3,14 @@
 
 export const ENGINE_VERSION = '0.0.0';
 
+export { counterValue, liveAdds, orSetElements } from './crdt';
+export type { IncrementOperation, SetElementOperation } from './crdt';
 export { compareTimestamps, HybridClock } from './hlc';
 export type { Timestamp } from './hlc';
+export { REGISTER_STRATEGIES, standingWrites, unreplaced } from './registers';
+export type { RegisterStrategy, SetOperation } from './registers';
 export { Replica } from './replica';
+export type { ReplicaOptions } from './replica';
 export { createRng } from './rng';
 export type { Rng } from './rng';
 export { PERFECT_NETWORK, Simulation } from './simulation';
@@ -21,6 +26,10 @@ export type {
 } from './simulation';
 export { pull, syncPair } from './sync';
 export type {
+  Change,
+  ChangeType,
+  Conflict,
+  FieldKind,
   FieldName,
   FieldValue,
   NodeId,
@@ -28,6 +37,7 @@ export type {
   Operation,
   RecordId,
   RecordState,
+  Schema,
   Snapshot,
   VersionVector,
 } from './types';

@@ -113,3 +113,57 @@ happened, why it mattered, and what changed.
   already been merged and its branch deleted, so creating the PR failed.
 - **Resolved:** Opened PR #2 against `main`. The branch is exactly the
   milestone 2 commits ahead of `main`.
+
+## Milestone 3: merge strategies and CRDTs
+
+### Vector clocks alone gave wrong or order-dependent conflicts
+
+- **Faced:** The plan was to stamp each write with the writer's version vector
+  and call a write "replaced" if a later write's vector covered it. Two
+  problems showed up on paper before any code:
+  - The version vector only covers the contiguous prefix of ops, so a value
+    the writer had actually seen (but received past a gap) would not count as
+    replaced, producing false conflicts.
+  - Keeping only the current "winners" and discarding replaced writes as ops
+    arrive makes the result depend on arrival order, which would break
+    convergence.
+- **Resolved:** Each write records exactly which values it replaces
+  (`supersedes`: the ids of the values standing on the writer's device at that
+  moment). The multi-value strategy computes, over all writes to the field,
+  those that nobody lists as replaced. That is a pure function of the op set,
+  so it cannot depend on arrival order, and it matches what the user saw on
+  screen. The same idea powers the OR-set (`observed` on removes).
+
+### Keeping the log strategy-independent
+
+- **Faced:** The playground needs to flip between strategies on the same
+  history, but a register built for last-write-wins throws away losing values.
+- **Resolved:** The replica keeps every op per field and derives values on
+  read. `supersedes` is always recorded, whatever the current strategy, so
+  switching to `multi-value` later still reports only real conflicts.
+
+### Conflicts listed in a different order on each device
+
+- **Faced:** Extending the network property test to all strategies found a
+  real bug immediately: every device found the same conflicts, but
+  `conflicts()` listed them in the order each device had received the records,
+  so the lists differed. Field order in `read()` had the same problem.
+- **Resolved:** `conflicts()`, `read()` and `snapshot()` sort by record and
+  field, so every device shows identical output. The property test now also
+  compares conflicts across devices.
+
+### Showing how naive apps lose updates
+
+- **Faced:** To demonstrate why CRDTs matter, the "wrong" way has to be real,
+  not a strawman.
+- **Resolved:** `increment` and `addElement` on a register field do exactly
+  what a typical app does (read the value, write back the new one). Tests show
+  two offline visits becoming one extra visit instead of two, and a concurrent
+  tag add being wiped out, while the counter and set fields keep both.
+
+### Mutation checks for the new code
+
+- **Faced:** New merge rules need the same proof that the tests can fail.
+- **Resolved:** Three planted bugs, each caught: a counter that ignores
+  decrements (3 tests failed), a remove that cancels unseen adds (4 failed),
+  and multi-value ignoring `supersedes` (4 failed).
