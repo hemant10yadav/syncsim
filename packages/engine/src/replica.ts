@@ -160,7 +160,7 @@ export class Replica {
     const fields = this.#fieldOps.get(record);
     if (!fields) return undefined;
     const state: Record<FieldName, FieldValue> = {};
-    for (const field of fields.keys()) {
+    for (const field of sortedKeys(fields)) {
       const value = this.value(record, field);
       if (value !== undefined) state[field] = value;
     }
@@ -168,9 +168,7 @@ export class Replica {
   }
 
   snapshot(): Snapshot {
-    return Object.fromEntries(
-      [...this.#fieldOps.keys()].map((record) => [record, this.read(record)!]),
-    );
+    return Object.fromEntries(sortedKeys(this.#fieldOps).map((record) => [record, this.read(record)!]));
   }
 
   /** The write currently displayed for a register field, for explaining why a value is what it is. */
@@ -178,11 +176,14 @@ export class Replica {
     return this.#standing(record, field)[0];
   }
 
-  /** Register fields with more than one standing write. Only the multi-value strategy produces these. */
+  /**
+   * Register fields with more than one standing write, sorted by record then field.
+   * Only the multi-value strategy produces these.
+   */
   conflicts(): Conflict[] {
     const found: Conflict[] = [];
-    for (const [record, fields] of this.#fieldOps) {
-      for (const field of fields.keys()) {
+    for (const record of sortedKeys(this.#fieldOps)) {
+      for (const field of sortedKeys(this.#fieldOps.get(record)!)) {
         if (this.kindOf(field) !== 'register') continue;
         const candidates = this.#standing(record, field);
         if (candidates.length > 1) found.push({ record, field, candidates });
@@ -252,6 +253,12 @@ export class Replica {
     this.#contiguous.set(op.node, upTo);
   }
 }
+
+/**
+ * Map keys in a fixed order. Maps iterate in arrival order, which differs between
+ * devices, so anything shown to a user is sorted to look the same everywhere.
+ */
+const sortedKeys = <K extends string>(map: ReadonlyMap<K, unknown>): K[] => [...map.keys()].sort();
 
 // Ops whose change does not match the field's kind (possible only if replicas
 // disagree on the schema) are ignored by every replica alike, so state still converges.
