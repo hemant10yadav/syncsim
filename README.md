@@ -27,5 +27,6 @@ npm run build      # production build of the playground
 
 ## Docs
 
+- [Approach](docs/APPROACH.md): how it works, the trade-offs, and where it would break in production
 - [Plan](docs/PLAN.md): goals, ground rules, milestones and their status
 - [Journal](docs/JOURNAL.md): problems we hit and how we resolved them
