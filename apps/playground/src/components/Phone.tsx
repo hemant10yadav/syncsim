@@ -1,18 +1,31 @@
-import type { Conflict, FieldName, FieldValue, NodeId, Simulation } from '@syncsim/engine'
+import type { Conflict, FieldName, FieldValue, NodeId, Replica } from '@syncsim/engine'
 import { useState } from 'react'
-import { CASE, deviceLabel, SKEW_OPTIONS, STATUS_OPTIONS, TAG_OPTIONS, type FieldMode } from '../world'
+import { CASE, SKEW_OPTIONS, STATUS_OPTIONS, TAG_OPTIONS } from '../world'
 
-interface PhoneProps {
-  sim: Simulation
-  id: NodeId
-  mode: FieldMode
-  act: (change: (sim: Simulation) => void) => void
+/** What a phone panel shows. The same panel renders a simulated device or a real browser tab. */
+export interface PhoneView {
+  readonly title: string
+  readonly replica: Replica
+  readonly online: boolean
+  /** Omitted for a device on a real clock, which hides the clock control. */
+  readonly clockSkew?: number
+  /** Extra status text, such as how many peers a tab can see. */
+  readonly detail?: string
+  readonly labelFor: (node: NodeId) => string
 }
 
-export function Phone({ sim, id, mode, act }: PhoneProps) {
-  const replica = sim.replica(id)
-  const online = sim.isOnline(id)
-  const skew = sim.clockSkew(id)
+/** Edits to the patient case, and device controls. */
+export interface PhoneActions {
+  setOnline(online: boolean): void
+  setClockSkew?(skewMs: number): void
+  set(field: FieldName, value: FieldValue): void
+  increment(field: FieldName): void
+  addElement(field: FieldName, element: string): void
+  removeElement(field: FieldName, element: string): void
+}
+
+export function Phone({ view, actions }: { view: PhoneView; actions: PhoneActions }) {
+  const { title, replica, online, clockSkew, detail, labelFor } = view
   const conflicts = replica.conflicts().filter((c) => c.record === CASE)
   const conflictOn = (field: FieldName) => conflicts.find((c) => c.field === field)
 
@@ -23,54 +36,50 @@ export function Phone({ sim, id, mode, act }: PhoneProps) {
   const statusWriter = replica.winner(CASE, 'status')?.node
 
   return (
-    <article className={`phone${online ? '' : ' phone--offline'}`} aria-label={deviceLabel(id)}>
+    <article className={`phone${online ? '' : ' phone--offline'}`} aria-label={title}>
       <header className="phone__header">
         <div>
-          <h2 className="phone__title">{deviceLabel(id)}</h2>
+          <h2 className="phone__title">{title}</h2>
           <p className="phone__meta">
             <span className={`dot${online ? ' dot--on' : ''}`} aria-hidden />
             {online ? 'Online' : 'Offline'} · holds {replica.missingFor({}).length} edits
+            {detail && ` · ${detail}`}
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn--small"
-          onClick={() => act((s) => s.setOnline(id, !online))}
-        >
+        <button type="button" className="btn btn--small" onClick={() => actions.setOnline(!online)}>
           {online ? 'Go offline' : 'Go online'}
         </button>
       </header>
 
-      <label className="phone__clock">
-        <span>Clock</span>
-        <select
-          value={skew}
-          onChange={(e) => act((s) => s.setClockSkew(id, Number(e.target.value)))}
-        >
-          {SKEW_OPTIONS.map((o) => (
-            <option key={o.ms} value={o.ms}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {clockSkew !== undefined && actions.setClockSkew && (
+        <label className="phone__clock">
+          <span>Clock</span>
+          <select value={clockSkew} onChange={(e) => actions.setClockSkew?.(Number(e.target.value))}>
+            {SKEW_OPTIONS.map((o) => (
+              <option key={o.ms} value={o.ms}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="field">
         <span className="field__label">Patient</span>
         <TextField
           value={name}
-          label={`Patient name on ${deviceLabel(id)}`}
-          onCommit={(v) => act((s) => s.edit(id, CASE, 'name', v))}
+          label={`Patient name on ${title}`}
+          onCommit={(v) => actions.set('name', v)}
         />
-        <ConflictPicker conflict={conflictOn('name')} onPick={(v) => act((s) => s.edit(id, CASE, 'name', v))} />
+        <ConflictPicker conflict={conflictOn('name')} labelFor={labelFor} onPick={(v) => actions.set('name', v)} />
       </div>
 
       <div className="field">
         <span className="field__label">Status</span>
         <select
-          aria-label={`Status on ${deviceLabel(id)}`}
+          aria-label={`Status on ${title}`}
           value={status}
-          onChange={(e) => act((s) => s.edit(id, CASE, 'status', e.target.value))}
+          onChange={(e) => actions.set('status', e.target.value)}
         >
           {STATUS_OPTIONS.map((o) => (
             <option key={o} value={o}>
@@ -79,21 +88,18 @@ export function Phone({ sim, id, mode, act }: PhoneProps) {
           ))}
         </select>
         {statusWriter && !conflictOn('status') && (
-          <span className="field__hint">set by {deviceLabel(statusWriter)}</span>
+          <span className="field__hint">set by {labelFor(statusWriter)}</span>
         )}
-        <ConflictPicker
-          conflict={conflictOn('status')}
-          onPick={(v) => act((s) => s.edit(id, CASE, 'status', v))}
-        />
+        <ConflictPicker conflict={conflictOn('status')} labelFor={labelFor} onPick={(v) => actions.set('status', v)} />
       </div>
 
       <div className="field">
         <span className="field__label">
-          Visits <KindBadge crdt={mode === 'crdt'} crdtName="counter" />
+          Visits <KindBadge crdt={replica.kindOf('visits') === 'counter'} crdtName="counter" />
         </span>
         <div className="field__row">
           <span className="visits">{typeof visits === 'number' ? visits : 0}</span>
-          <button type="button" className="btn btn--small" onClick={() => act((s) => s.increment(id, CASE, 'visits'))}>
+          <button type="button" className="btn btn--small" onClick={() => actions.increment('visits')}>
             +1 visit
           </button>
         </div>
@@ -101,7 +107,7 @@ export function Phone({ sim, id, mode, act }: PhoneProps) {
 
       <div className="field">
         <span className="field__label">
-          Tags <KindBadge crdt={mode === 'crdt'} crdtName="set" />
+          Tags <KindBadge crdt={replica.kindOf('tags') === 'set'} crdtName="set" />
         </span>
         <ul className="tags">
           {tags.map((tag) => (
@@ -110,8 +116,8 @@ export function Phone({ sim, id, mode, act }: PhoneProps) {
               <button
                 type="button"
                 className="tag__remove"
-                aria-label={`Remove ${tag} on ${deviceLabel(id)}`}
-                onClick={() => act((s) => s.removeElement(id, CASE, 'tags', tag))}
+                aria-label={`Remove ${tag} on ${title}`}
+                onClick={() => actions.removeElement('tags', tag)}
               >
                 ×
               </button>
@@ -125,7 +131,7 @@ export function Phone({ sim, id, mode, act }: PhoneProps) {
               key={tag}
               type="button"
               className="chip"
-              onClick={() => act((s) => s.addElement(id, CASE, 'tags', tag))}
+              onClick={() => actions.addElement('tags', tag)}
             >
               + {tag}
             </button>
@@ -160,14 +166,20 @@ function TextField({ value, label, onCommit }: { value: string; label: string; o
   )
 }
 
-function ConflictPicker({ conflict, onPick }: { conflict: Conflict | undefined; onPick: (v: string) => void }) {
+interface ConflictPickerProps {
+  conflict: Conflict | undefined
+  labelFor: (node: NodeId) => string
+  onPick: (v: string) => void
+}
+
+function ConflictPicker({ conflict, labelFor, onPick }: ConflictPickerProps) {
   if (!conflict) return null
   return (
     <div className="conflict" role="group" aria-label="Conflicting versions">
       <span className="conflict__title">{conflict.candidates.length} versions. Keep one:</span>
       {conflict.candidates.map((op) => (
         <button key={op.id} type="button" className="chip chip--conflict" onClick={() => onPick(asString(op.change.value))}>
-          “{asString(op.change.value)}” <span className="chip__from">{deviceLabel(op.node)}</span>
+          “{asString(op.change.value)}” <span className="chip__from">{labelFor(op.node)}</span>
         </button>
       ))}
     </div>
